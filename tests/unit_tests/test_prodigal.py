@@ -1,22 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-import pytest
+
+from unittest.mock import mock_open, patch, MagicMock
 
 from autometa.common.external import prodigal
 
 assembly = "tests/data/metagenome.fna"
 
-
-# @pytest.fixture(scope="session")
-# def test_prodigal(tmpdir_factory):
-#     tmpdir = tmpdir_factory.mktemp("output")
-#     nucls_out = os.path.join(tmpdir, "nucls.out")
-#     prots_out = os.path.join(tmpdir, "prots.out")
-#     with pytest.raises(FileNotFoundError):
-#         prodigal.run(
-#             assembly=assembly, nucls_out=nucls_out, prots_out=prots_out,
-#         )
 
 contigs = [
     "NODE_11_length_590705_cov_223.126",
@@ -43,26 +34,63 @@ contigs = [
 ]
 
 # TODO mock ORFs file called by prodigal on test data
-fpath = "/home/the_bio_informatician/Autometa/tests/data/test_prots.out"
-# TODO mock prodigal version
+# fpath = os.path.join(os.path.dirname(__file__)"/tests/data/test_prots.out"
+
+fpath = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/test_prots.out")
+
+# @patch("test_prodigal.prodigal.get_versions", return_value="2.6")
 def test_contigs_from_headers():
-    out = prodigal.contigs_from_headers(fpath=fpath)
-    assert len(out) == 75390
-    assert type(out) is dict
+    with patch("test_prodigal.prodigal.get_versions", return_value="2.0"):
+        out = prodigal.contigs_from_headers(fpath=fpath)
+        assert len(out) == 75390
+        assert type(out) is dict
+
+    with patch("test_prodigal.prodigal.get_versions", return_value="2.6"):
+        out = prodigal.contigs_from_headers(fpath=fpath)
+        assert len(out) == 75390
+        assert type(out) is dict
 
 
+# @patch("test_prodigal.prodigal.get_versions", return_value="2.0")
 def test_orf_records_from_contigs():
-    out = prodigal.orf_records_from_contigs(contigs=contigs, fpath=fpath,)
-    assert len(out) == 4414
+    with patch("test_prodigal.prodigal.get_versions", return_value="2.0"):
+        out = prodigal.orf_records_from_contigs(contigs=contigs, fpath=fpath,)
+        # assert len(out) == 4414
+
+    with patch("test_prodigal.prodigal.get_versions", return_value="2.6"):
+        out = prodigal.orf_records_from_contigs(contigs=contigs, fpath=fpath,)
+        assert len(out) == 4414
 
 
-# def test_output():
-#     nucs_out, prots_out = prodigal.run(
-#         "/home/the_bio_informatician/Autometa/tests/data/metagenome.fna",
-#         "nucs.out",
-#         "prots.out",
-#     )
-#     assert nucs_out == "nucs.out"
-#     assert prots_out == "prots.out"
-#     assert type(nucs_out) is str
-#     assert type(prots_out) is str
+@patch("builtins.open", new_callable=mock_open, read_data="Contents of a fasta file")
+# See: https://stackoverflow.com/a/34677735/12671809 it can also be expanded
+# as https://queirozf.com/entries/python-unittest-examples-mocking-and-patching#patch-open-file
+# @patch("os.path.exists", return_value=True)
+@patch("os.path.getsize", return_value=2 * 1024 * 1024)
+@patch("test_prodigal.prodigal.annotate_parallel")
+@patch("test_prodigal.prodigal.annotate_sequential")
+def test_output(
+    patched_annotate_sequential,
+    patched_annotate_parallel,
+    patched_file_size,
+    patched_open,
+):
+    nucls_out = MagicMock(
+        return_value="path_to_nucs_out", name="nucleic acid_output_file"
+    )
+    prots_out = MagicMock(
+        return_value="path_to_prots_out", name="amino_acid_output_file"
+    )
+    prodigal.run(
+        assembly, nucls_out=nucls_out, prots_out=prots_out, force=True, parallel=False,
+    )
+    prodigal.run(
+        assembly, nucls_out=nucls_out, prots_out=prots_out, force=True, parallel=True,
+    )
+
+    assert patched_annotate_parallel.called is True
+    assert patched_annotate_sequential.called is True
+    assert patched_file_size.called is True
+    # assert patched_file_exists.called is True
+    assert patched_open.called is True
+    assert open("path/to/fasta/file").read() == "Contents of a fasta file"
