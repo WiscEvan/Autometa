@@ -148,73 +148,69 @@ def get(
     pd.DataFrame
         index=contig cols=['coverage']
     """
-    if os.path.exists(out) and os.stat(out).st_size > 0:
+    if os.path.exists(out) and os.path.getsize(out) > 0:
         # COMBAK: checksum comparison [checkpoint]
         logger.debug(f"coverage ({out}) already exists. skipping...")
         cols = ["contig", "coverage"]
         return pd.read_csv(out, sep="\t", usecols=cols, index_col="contig")
     try:
-        outdir = os.path.dirname(out)
-        tempdir = tempfile.mkdtemp(suffix=None, prefix="cov-alignments", dir=outdir)
-        bed = bed if bed else os.path.join(tempdir, "alignment.bed")
-        bam = bam if bam else os.path.join(tempdir, "alignment.bam")
-        lengths = lengths if lengths else os.path.join(tempdir, "lengths.tsv")
-        sam = sam if sam else os.path.join(tempdir, "alignment.sam")
-        db = os.path.join(tempdir, "alignment.db")
+        with tempfile.TemporaryDirectory() as tempdir:
+            bed = bed if bed else os.path.join(tempdir, "alignment.bed")
+            bam = bam if bam else os.path.join(tempdir, "alignment.bam")
+            lengths = lengths if lengths else os.path.join(tempdir, "lengths.tsv")
+            sam = sam if sam else os.path.join(tempdir, "alignment.sam")
+            db = os.path.join(tempdir, "alignment.db")
 
-        def parse_bed(bed=bed, out=out):
-            return bedtools.parse(bed, out)
+            def parse_bed(bed=bed, out=out):
+                return bedtools.parse(bed, out)
 
-        def make_bed(lengths=lengths, fasta=fasta, bam=bam, bed=bed):
-            if not os.path.exists(lengths):
-                lengths = make_length_table(fasta, lengths)
-            bedtools.genomecov(bam, lengths, bed)
+            def make_bed(lengths=lengths, fasta=fasta, bam=bam, bed=bed):
+                if not os.path.exists(lengths):
+                    lengths = make_length_table(fasta, lengths)
+                bedtools.genomecov(bam, lengths, bed)
 
-        def sort_samfile(sam=sam, bam=bam, nproc=nproc):
-            samtools.sort(sam, bam, cpus=nproc)
+            def sort_samfile(sam=sam, bam=bam, nproc=nproc):
+                samtools.sort(sam, bam, cpus=nproc)
 
-        def align_reads(
-            fasta=fasta,
-            db=db,
-            sam=sam,
-            fwd_reads=fwd_reads,
-            rev_reads=rev_reads,
-            se_reads=se_reads,
-            nproc=nproc,
-        ):
-            bowtie.build(fasta, db)
-            bowtie.align(db, sam, fwd_reads, rev_reads, se_reads, nproc=nproc)
+            def align_reads(
+                fasta=fasta,
+                db=db,
+                sam=sam,
+                fwd_reads=fwd_reads,
+                rev_reads=rev_reads,
+                se_reads=se_reads,
+                nproc=nproc,
+            ):
+                bowtie.build(fasta, db)
+                bowtie.align(db, sam, fwd_reads, rev_reads, se_reads, nproc=nproc)
 
-        # Setup of coverage calculation sequence depending on file(s) provided
-        calculation_sequence = {
-            "bed_exists": [parse_bed],
-            "bam_exists": [make_bed, parse_bed],
-            "sam_exists": [sort_samfile, make_bed, parse_bed],
-            "full": [align_reads, sort_samfile, make_bed, parse_bed],
-        }
-        # Now need to determine which point to start calculation...
-        for fp, argname in zip([bed, bam, sam], ["bed", "bam", "sam"]):
-            step = "full"
-            if os.path.exists(fp):
-                step = f"{argname}_exists"
-                break
-
-        if (not fwd_reads or not rev_reads) and step == "full":
-            raise ValueError(
-                f"fwd_reads and rev_reads are required if no other alignments are specified!"
-            )
-        logger.debug(f"starting coverage calculation sequence from {step}")
-        for calculation in calculation_sequence[step]:
-            logger.debug(f"running {calculation.__name__}")
-            if calculation.__name__ == "parse_bed":
-                return calculation()
-            calculation()
+            # Setup of coverage calculation sequence depending on file(s) provided
+            calculation_sequence = {
+                "bed_exists": [parse_bed],
+                "bam_exists": [make_bed, parse_bed],
+                "sam_exists": [sort_samfile, make_bed, parse_bed],
+                "full": [align_reads, sort_samfile, make_bed, parse_bed],
+            }
+            # Now need to determine which point to start calculation...
+            for fp, argname in zip([bed, bam, sam], ["bed", "bam", "sam"]):
+                step = "full"
+                if os.path.exists(fp) and os.path.getsize(out) > 0:
+                    step = f"{argname}_exists"
+                    break
+            if ((not fwd_reads or not rev_reads) and not se_reads) and step == "full":
+                raise ValueError(
+                    f"fwd_reads and rev_reads are required if no other alignments are specified!"
+                )
+            logger.debug(f"starting coverage calculation sequence from {step}")
+            for calculation in calculation_sequence[step]:
+                logger.debug(f"running {calculation.__name__}")
+                if calculation.__name__ == "parse_bed":
+                    return calculation()
+                calculation()
 
     except Exception as err:
         logger.exception(err)
         raise err
-    finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
 
 
 def main():
