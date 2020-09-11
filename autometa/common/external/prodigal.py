@@ -185,7 +185,7 @@ def run(assembly, nucls_out, prots_out, force=False, cpus=0, parallel=True):
             with open(fp) as fh:
                 for _ in SimpleFastaParser(fh):
                     pass
-        except (IOError, ValueError):
+        except (OSError, ValueError):
             raise IOError(f"InvalidFileFormat: {fp}")
     return nucls_out, prots_out
 

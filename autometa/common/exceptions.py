@@ -131,7 +131,7 @@ class DatabaseOutOfSyncError(AutometaError):
         return f"{self.value}\n{message}"
 
 
-class ExternalToolError(AutometaException):
+class ExternalToolError(AutometaError):
     """
     Raised when samtools sort is not executed properly.
 
