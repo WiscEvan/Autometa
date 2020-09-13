@@ -36,11 +36,9 @@ from Bio.SeqIO.FastaIO import SimpleFastaParser
 from Bio import SeqUtils
 from functools import lru_cache
 
-from autometa.common.markers import Markers, MARKERS_DIR
 from autometa.common import kmers
 from autometa.common.utilities import timeit
 from autometa.common.external import prodigal
-from autometa.binning import recursive_dbscan
 
 
 logger = logging.getLogger(__name__)
@@ -53,8 +51,10 @@ class MetaBin:
     ----------
     assembly : str
         </path/to/metagenome.fasta>
-    contigs : list
-        List of contigs to manipulate/annotate (must be contained in metagenome).
+    contig_ids : list
+        List of contig ids to manipulate/annotate (must be contained in metagenome).
+    seqrecords : list
+        List of seqrecords to manipulate/annotate (must be contained in metagenome).
     outdir : str, optional
         </path/to/output/directory> (Default is the directory storing the `assembly`).
 
@@ -65,9 +65,9 @@ class MetaBin:
     root : str
         root name of `assembly` (Will remove common extension like '.fasta')
     nucls_fname : str
-        File name of `contigs` nucleotide ORFs
+        File name of contigs nucleotide ORFs
     prots_fname : str
-        File name of `contigs` amino-acid ORFs
+        File name of contigs amino-acid ORFs
     nucl_orfs_fpath : str
         </path/to/nucleotide/`outdir`/`nucls_fname`>
     prot_orfs_fpath : str
@@ -75,9 +75,28 @@ class MetaBin:
     nseqs : int
         Number of contigs in MetaBin
 
+    Raises
+    ------
+    ValueError
+        One of `contig_ids` or `seqrecords` must be provided
+    ValueError
+        `contig_ids` do not match `seqrecords`
     """
 
-    def __init__(self, assembly, contigs, outdir=None):
+    def __init__(self, assembly, contig_ids=[], seqrecords=[], outdir=None):
+        if not contig_ids and not seqrecords:
+            raise ValueError("One of `contig_ids` or `seqrecords` must be provided!")
+        if contig_ids and seqrecords:
+            contig_id_diff = set(contig_ids).difference({rec.id for rec in seqrecords})
+            if contig_id_diff:
+                raise ValueError(
+                    f"`contig_ids` do not match `seqrecords`. Extra `contig_ids`: {contig_id_diff}"
+                )
+            seqrecord_diff = {rec.id for rec in seqrecords}.difference(contig_ids)
+            if seqrecord_diff:
+                raise ValueError(
+                    f"`seqrecords` do not match `contig_ids`. Extra `seqrecords`: {seqrecord_diff}"
+                )
         self.assembly = os.path.realpath(assembly)
         self.basename = os.path.basename(self.assembly)
         self.root = os.path.splitext(self.basename)[0]
@@ -90,8 +109,16 @@ class MetaBin:
         self.prots_fname = ".".join([self.root, prots_ext])
         self.nucl_orfs_fpath = os.path.join(self.outdir, self.nucls_fname)
         self.prot_orfs_fpath = os.path.join(self.outdir, self.prots_fname)
-        self.contigs = contigs
-        self.nseqs = len(self.contigs)
+        if contig_ids and not seqrecords:
+            self.contig_ids = contig_ids
+            self.seqrecords = self.get_seqrecords()
+        elif seqrecords and not contig_ids:
+            self.seqrecords = seqrecords
+            self.contig_ids = self.get_contig_ids()
+        else:
+            self.seqrecords = seqrecords
+            self.contig_ids = contig_ids
+        self.nseqs = len(self.contig_ids)
 
     @property
     @lru_cache(maxsize=None)
@@ -107,10 +134,19 @@ class MetaBin:
         with open(self.assembly) as fh:
             return [seq for title, seq in SimpleFastaParser(fh)]
 
-    @property
-    @lru_cache(maxsize=None)
-    def seqrecords(self):
-        """Retrieve seqrecords from assembly contained in `self.contigs`.
+    def get_contig_ids(self):
+        """Retrieve contig_ids from `self.seqrecords`.
+
+            Returns
+            -------
+            set
+                {contig_id, contig_id, ...}
+
+            """
+        return {seqrecord.id for seqrecord in self.seqrecords}
+
+    def get_seqrecords(self):
+        """Retrieve seqrecords from assembly contained in `self.contig_ids`.
 
         Returns
         -------
@@ -119,7 +155,9 @@ class MetaBin:
 
         """
         return [
-            seq for seq in SeqIO.parse(self.assembly, "fasta") if seq.id in self.contigs
+            seqrecord
+            for seqrecord in SeqIO.parse(self.assembly, "fasta")
+            if seqrecord.id in self.contig_ids
         ]
 
     @property
@@ -186,10 +224,36 @@ class MetaBin:
         """
         return sum(len(seq) for seq in self.seqrecords)
 
+    def fragmentation_metric(self, quality_measure=0.50):
+        """Describes the quality of assembled genomes that are fragmented in
+        contigs of different length.
+
+        For more information see:
+            http://www.metagenomics.wiki/pdf/definition/assembly/n50
+
+        Parameters
+        ----------
+        quality_measure : 0 < float < 1
+            Description of parameter `quality_measure` (the default is .50).
+            I.e. default measure is N50, but could use .1 for N10 or .9 for N90
+
+        Returns
+        -------
+        int
+            Minimum contig length to cover `quality_measure` of genome (i.e. percentile contig length)
+
+        """
+        target_size = self.size * quality_measure
+        lengths = 0
+        for length in sorted([len(record) for record in self.seqrecords], reverse=True):
+            lengths += length
+            if lengths > target_size:
+                return length
+
     @property
     @lru_cache(maxsize=None)
     def length_weighted_gc(self):
-        """Get the length weighted GC content of `contigs`.
+        """Get the length weighted GC content of `seqrecords`.
 
         Returns
         -------
@@ -302,11 +366,11 @@ class MetaBin:
         if not self.prepared(orfs_fpath):
             raise FileNotFoundError(orfs_fpath)
         return prodigal.orf_records_from_contigs(
-            contigs=self.contigs, fpath=self.prot_orfs_fpath
+            contigs=self.contig_ids, fpath=self.prot_orfs_fpath
         )
 
     def write_orfs(self, fpath, orf_type="prot"):
-        """Write `orf_type` ORFs from `contigs` to `fpath`.
+        """Write `orf_type` ORFs from `contigs_ids` to `fpath`.
 
         Parameters
         ----------
@@ -350,125 +414,8 @@ class MetaBin:
             f"Prot. ORFs called: {self.prot_orfs_exist}\n"
         )
 
-    @timeit
-    def get_binning(self, method="recursive_dbscan", **kwargs):
-        """Retrieve binning results from provided `method`.
-
-        Note: Most required arguments should be provided in `kwargs`, this is
-        currently done to allow easy addition of other binning methods via `method` arg.
-
-        Parameters
-        ----------
-        method : str
-            Description of parameter `method` (the default is 'recursive_dbscan').
-        **kwargs : dict
-            Additional keyword arguments to be passed in respective to the provided
-            `method`
-
-            * kmers : str, </path/to/kmers.tsv>
-            * embedded : str, </path/to/kmers.embedded.tsv>
-            * do_pca : bool, Perform PCA prior to embedding
-            * embedding_method : str, Embedding method to use choices=['sksne','bhsne','umap']
-            * perplexity : float, perplexity setting for embedding method sksne/bhsne
-            * coverage : str, </path/to/coverages.tsv>
-            * taxonomy : str, </path/to/taxonomy.tsv>
-            * domain : str, kindom to bin choices=['bacteria','archaea']
-            * purity : float, purity cutoff to apply to bins
-            * completeness : float, completeness cutoff to apply to bins
-            * reverse : bool, If true will bin taxa from least to most specific rank
-
-        Returns
-        -------
-        pd.DataFrame
-            index=contig cols=['cluster','completeness','purity',...]
-
-        Raises
-        -------
-        NotImplementedError
-            Provided `method` is not yet implemented.
-
-        """
-        if method == "recursive_dbscan":
-            try:
-                embedded_df = kmers.embed(
-                    kmers=kwargs.get("kmers"),
-                    embedded=kwargs.get("embedded"),
-                    do_pca=kwargs.get("do_pca", True),
-                    pca_dimensions=kwargs.get("pca_dims", 50),
-                    method=kwargs.get("embedding_method", "bhsne"),
-                    perplexity=kwargs.get("perplexity", 30),
-                )
-            except ValueError as error:
-                logger.exception(error)
-            master_df = embedded_df
-            coverage_fp = kwargs.get("coverage")
-            if coverage_fp:
-                coverage_df = pd.read_csv(coverage_fp, sep="\t", index_col="contig")
-                master_df = pd.merge(
-                    master_df,
-                    coverage_df,
-                    how="left",
-                    left_index=True,
-                    right_index=True,
-                )
-            taxonomy_fp = kwargs.get("taxonomy")
-            if taxonomy_fp:
-                taxa_df = pd.read_csv(taxonomy_fp, sep="\t", index_col="contig")
-                master_df = pd.merge(
-                    left=master_df,
-                    right=taxa_df,
-                    how="left",
-                    left_index=True,
-                    right_index=True,
-                )
-            master_df = self.subset_df(master_df)
-            master_df = master_df.convert_dtypes()
-            use_taxonomy = True if "taxid" in master_df else False
-            markers = self.markers(kwargs.get("domain", "bacteria"))
-            logger.info(f'Binning {kwargs.get("domain")} with {method}')
-            return recursive_dbscan.binning(
-                master=master_df,
-                markers=markers,
-                domain=kwargs.get("domain", "bacteria"),
-                completeness=kwargs.get("completeness", 20.0),
-                purity=kwargs.get("purity", 90.0),
-                taxonomy=use_taxonomy,
-                method="DBSCAN",
-                reverse=kwargs.get("reverse", True),
-            )
-        raise NotImplementedError(f"{method} not yet implemented")
-
-    @timeit
-    def markers(self, kingdom="bacteria", dbdir=MARKERS_DIR, force=False):
-        f"""Retrieve Markers dataframe using orfs called from `orf_caller` and
-        annotated belonging to provided `kingdom`.
-
-        Parameters
-        ----------
-        kingdom : str, optional
-            Domain specific markers to retrieve (the default is 'bacteria').
-        dbdir : str, optional
-            </path/to/markers/database/directory> (the default is {MARKERS_DIR}).
-            Should contain pressed hmms and cutoffs table.
-        force : bool, optional
-            Will overwrite existing marker annotations (the default is {force}).
-
-        Returns
-        -------
-        pd.DataFrame
-            wide format - index_col='contig', columns=[PFAM,...]
-
-        """
-
-        logger.debug(f"Retrieving markers for {kingdom} kingdom")
-        orfs_fp = os.path.join(self.outdir, f"{kingdom.lower()}.orfs.faa")
-        if (not os.path.exists(orfs_fp)) or (os.path.exists(orfs_fp) and force):
-            self.write_orfs(orfs_fp)
-        markers = Markers(orfs_fp, kingdom=kingdom, dbdir=dbdir)
-        return markers.get()
-
     def subset_df(self, df):
-        """Retrieve subset of provided `df` containing only `contigs`.
+        """Retrieve subset of provided `df` containing only `contig_ids`.
 
         Parameters
         ----------
@@ -479,51 +426,20 @@ class MetaBin:
         Returns
         -------
         pd.DataFrame
-            index='contig', cols=cols in provided `df`, subset by `contigs`.
+            index='contig', cols=cols in provided `df`, subset by `contig_ids`.
 
         """
         if type(df) not in [pd.DataFrame, pd.Series]:
             raise TypeError(
                 f"Unable to subset df. {type(df)} is not Series or DataFrame"
             )
-        if type(df) is pd.DataFrame:
-            return df[df.index.isin(self.contigs)]
-        elif type(df) is str and self.prepared(df):
+        if isinstance(df, pd.DataFrame):
+            return df[df.index.isin(self.contig_ids)]
+        elif isinstance(df, str) and self.prepared(df):
             df = pd.read_csv(df, sep="\t", index_col="contig")
-        return df[df.index.isin(self.contigs)]
-
-
-def main():
-    import argparse
-    import logging as logger
-
-    logger.basicConfig(
-        format="%(asctime)s : %(name)s : %(levelname)s : %(message)s",
-        datefmt="%m/%d/%Y %I:%M:%S %p",
-        level=logger.DEBUG,
-    )
-    parser = argparse.ArgumentParser(description="Autometa MetaBin Class")
-    parser.add_argument("--assembly", help="</path/to/metagenome.fasta>", required=True)
-    parser.add_argument(
-        "--contigs", help="list of contigs in MetaBin", nargs="+", required=True
-    )
-    parser.add_argument(
-        "--domain", help="kingdom to use for binning", default="bacteria"
-    )
-    parser.add_argument("--kmers", help="</path/to/kmers.tsv")
-    parser.add_argument("--taxonomy", help="</path/to/taxonomy_vote.tsv")
-    parser.add_argument("--coverage", help="</path/to/coverages.tsv")
-    args = parser.parse_args()
-    mag = MetaBin(args.assembly, args.contigs)
-
-    mag.get_binning(
-        method="recursive_dbscan",
-        kmers=args.kmers,
-        domain=args.domain,
-        taxonomy=args.taxonomy,
-        coverage=args.coverage,
-    )
+        return df[df.index.isin(self.contig_ids)]
 
 
 if __name__ == "__main__":
-    main()
+    print("MetaBin is part of Autometa and should not be run directly.")
+    pass
