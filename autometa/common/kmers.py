@@ -82,11 +82,13 @@ def init_kmers(kmer_size=5):
         {kmer:index, ...}
 
     """
-    kmers = {}
+    if not float(kmer_size).is_integer():
+        raise TypeError(f"kmer_size must be an int! Given: {type(kmer_size)}")
+    kmer_size = int(float(kmer_size))
     index = 0
     uniq_kmers = dict()
     dna_letters = ["A", "T", "C", "G"]
-    all_kmers = list(dna_letters)
+    all_kmers = dna_letters
     for i in range(1, kmer_size):
         new_list = []
         for current_seq in all_kmers:
@@ -108,7 +110,7 @@ def load(kmers_fpath):
     Parameters
     ----------
     kmers_fpath : str
-        Description of parameter `kmers_fpath`.
+        Path to kmer frequency table
 
     Returns
     -------
@@ -123,11 +125,11 @@ def load(kmers_fpath):
         `kmers_fpath` file format is invalid
 
     """
-    if not os.path.exists(kmers_fpath) or os.stat(kmers_fpath).st_size == 0:
+    if not os.path.exists(kmers_fpath) or os.path.getsize(kmers_fpath) == 0:
         raise FileNotFoundError(kmers_fpath)
     try:
         df = pd.read_csv(kmers_fpath, sep="\t", index_col="contig")
-    except ValueError as err:
+    except (ValueError, TypeError):
         raise KmerFormatError(kmers_fpath) from ValueError
     return df
 
@@ -222,7 +224,7 @@ def seq_counter(assembly, ref_kmers, verbose=True):
     Returns
     -------
     dict
-        {contig:[count,count,...]} count index is respective to ref_kmers.keys()
+        {contig:[count,count,...]} count index is respective to ref_kmers keys()
 
     """
     n_uniq_kmers = len(ref_kmers)
@@ -277,11 +279,11 @@ def count(
     Parameters
     ----------
     assembly : str
-        Description of parameter `assembly`.
+         </path/to/assembly.fasta>
     kmer_size : int, optional
-        length of k-mer to count `kmer_size` (the default is 5).
+        length of k-mer to count `kmer_size` (the default is 5)
     normalized : bool, optional
-        Whether to return the CLR normalized dataframe (the default is True).
+        Whether to return the CLR normalized dataframe (the default is True)
     verbose : bool, optional
         Enable progress bar `verbose` (the default is True).
     multiprocess : bool, optional
@@ -301,7 +303,8 @@ def count(
         `kmer_size` must be an int
 
     """
-    if not type(kmer_size) is int:
+    # checks if it is something like 12.0 vs. 12.9. Also check is an int has been passed as a string, like "5.0"
+    if not float(kmer_size).is_integer():
         raise TypeError(f"kmer_size must be an int! Given: {type(kmer_size)}")
     ref_kmers = init_kmers(kmer_size)
     if assembly.endswith(".gz"):
@@ -322,7 +325,7 @@ def count(
 
 
 def normalize(df):
-    """Normalize k-mers by Centered Log Ratio transformation
+    """Normalize k-mers by Centered Log Ratio (CLR) transformation
 
     1a. Drop any k-mers not present for all contigs
     1b. Drop any contigs not containing any kmer counts
@@ -425,11 +428,12 @@ def embed(
         kmers
         and type(kmers) is str
         and os.path.exists(kmers)
-        and os.stat(kmers).st_size > 0
+        and os.path.getsize(kmers) > 0
     ):
         try:
+            print("hiiiiiiiiiiiiiiiiiiiiiiiii")
             df = pd.read_csv(kmers, sep="\t", index_col="contig")
-        except ValueError as err:
+        except ValueError:
             raise KmerFormatError(embedded) from ValueError
     elif kmers and type(kmers) is pd.DataFrame:
         df = kmers
@@ -437,11 +441,11 @@ def embed(
         logger.debug(f"k-mers frequency embedding already exists {embedded}")
         try:
             df = pd.read_csv(embedded, sep="\t", index_col="contig")
-        except ValueError as err:
+        except ValueError:
             raise KmerFormatError(embedded) from ValueError
         return df
 
-    if df is None or df.empty:
+    if not df or df.empty:
         kmers_desc = f"kmers:{kmers} type:{type(kmers)}"
         embed_desc = f"embedded:{embedded} type:{type(embedded)}"
         requirements = f"kmers type must be a pd.DataFrame or filepath."
