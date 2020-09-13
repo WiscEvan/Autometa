@@ -141,9 +141,9 @@ def align(db, sam, fwd_reads=None, rev_reads=None, se_reads=None, nproc=0, **kwa
 
 
 def main(args):
-    db = build(args.assembly, args.database)
-    sam = align(
-        database=args.database,
+    build(args.assembly, args.database)
+    align(
+        db=args.database,
         sam=args.sam,
         fwd_reads=args.fwd_reads,
         rev_reads=args.rev_reads,
