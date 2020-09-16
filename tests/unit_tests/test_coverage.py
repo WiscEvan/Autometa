@@ -25,6 +25,7 @@ Script containing wrapper functions for bedtools.
 
 
 import os
+import pytest
 
 import pandas as pd
 
@@ -35,6 +36,11 @@ from autometa.common import coverage
 
 assembly = os.path.join("tests", "data", "metagenome.fna")
 coverage_out = os.path.join("tests", "data", "coverage.tsv")
+
+
+@pytest.fixture(scope="session")
+def make_temp_dir(tmpdir_factory):
+    return tmpdir_factory.mktemp("data")
 
 
 def test_from_spades_names():
@@ -49,17 +55,20 @@ def test_from_spades_names():
         assert float(cov.split("_cov_")[-1]) == coverages[cov]
 
 
-def test_make_length_table():
-    len_table = coverage.make_length_table(fasta=assembly, out="out")
+def test_make_length_table(make_temp_dir):
+    # str() is needed as by default tmpdir_factory return -> "class py._path.local.LocalPath "
+    # See https://stackoverflow.com/a/27034002/12671809
+    out_fpath = str(make_temp_dir.join("out"))
+    len_table = coverage.make_length_table(fasta=assembly, out=out_fpath)
     assert type(len_table) is str
 
 
 @patch("os.path.getsize", return_value=2 * 1024 * 1024)
-@patch("test_coverage.coverage.bowtie.align")
-@patch("test_coverage.coverage.bowtie.build")
-@patch("test_coverage.coverage.samtools.sort")
-@patch("test_coverage.coverage.bedtools.genomecov")
-@patch("test_coverage.coverage.bedtools.parse")
+@patch("autometa.common.coverage.bowtie.align")
+@patch("autometa.common.coverage.bowtie.build")
+@patch("autometa.common.coverage.samtools.sort")
+@patch("autometa.common.coverage.bedtools.genomecov")
+@patch("autometa.common.coverage.bedtools.parse")
 def test_get(
     patched_bedtools_parse,
     patched_bedtools_genomecov,
@@ -67,7 +76,9 @@ def test_get(
     patched_bowtie_build,
     patched_bowtie_align,
     patched_file_size,
+    make_temp_dir,
 ):
+    temp_out_fpath = make_temp_dir.join("cov_out")
     # Mocks of the files are needed to make sure that a Mock files "exists", when the test goes through coverage.py. Just putting a string in coverage.get() won't create a file and the test will fail while parsing through coverage.py
 
     bed_fpath = MagicMock(
@@ -93,24 +104,25 @@ def test_get(
     )
 
     out_df = coverage.get(fasta=assembly, out=coverage_out)
-    coverage.get(fasta=assembly, out="cov_out", bed=bed_fpath)
-    coverage.get(fasta=assembly, out="cov_out", bam=bam_fpath)
-    coverage.get(fasta=assembly, out="cov_out", sam=sam_fpath)
+    coverage.get(fasta=assembly, out=temp_out_fpath, bed=bed_fpath)
+    coverage.get(fasta=assembly, out=temp_out_fpath, bam=bam_fpath)
+    coverage.get(fasta=assembly, out=temp_out_fpath, sam=sam_fpath)
     coverage.get(
         fasta=assembly,
-        out="cov_out",
+        out=temp_out_fpath,
         fwd_reads=fwd_reads_fpath,
         rev_reads=rev_reads_fpath,
     )
     coverage.get(
-        fasta=assembly, out="cov_out", se_reads=se_reads_fpath,
+        fasta=assembly, out=temp_out_fpath, se_reads=se_reads_fpath,
     )
 
     assert len(out_df) == 3425
     assert out_df.index.name == "contig"
-    assert type(out_df) == pd.core.frame.DataFrame
+    assert type(out_df) is pd.DataFrame
     assert out_df.coverage.dtypes == "float64"
     assert list(out_df)[0] == "coverage"
+    assert out_df.shape == (3425, 1)
 
     assert patched_bedtools_parse.call_count == 5
     assert patched_bedtools_genomecov.call_count == 4

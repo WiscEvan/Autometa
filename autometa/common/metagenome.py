@@ -357,11 +357,11 @@ class Metagenome:
             cutoff value must be a positive real number
         FileExistsError
             filepath consisting of sequences that passed filter already exists
-
         """
-        if not isinstance(cutoff, numbers.Number) or isinstance(cutoff, bool):
-            # https://stackoverflow.com/a/4187220/13118765
-            raise TypeError(f"cutoff: {cutoff} must be a float or int")
+        try:
+            cutoff = float(cutoff)
+        except ValueError:
+            raise ValueError(f"Cutoff should be flaot of int, specified {cutoff}")
         if cutoff <= 0:
             raise ValueError(f"cutoff: {cutoff} must be a positive real number")
         if os.path.exists(out) and not force:
@@ -417,7 +417,7 @@ class Metagenome:
             ORF calling failed.
         """
         for arg, argname in zip([force, parallel], ["force", "parallel"]):
-            if not isinstance(arg, bool) and isinstance(arg, numbers.Number):
+            if not isinstance(arg, bool):
                 raise TypeError(f"{argname} must be a boolean!")
         if not isinstance(cpus, int) or isinstance(cpus, bool):
             raise TypeError(f"cpus:({cpus}) must be an integer!")
