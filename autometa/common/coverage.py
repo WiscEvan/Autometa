@@ -171,7 +171,7 @@ def get(
     if from_spades:
         return from_spades_names(records=[rec for rec in SeqIO.parse(fasta, "fasta")])
 
-    try:
+    with tempfile.TemporaryDirectory() as tempdir:
         outdir = os.path.dirname(out)
         tempdir = tempfile.mkdtemp(suffix=None, prefix="cov-alignments", dir=outdir)
         bed = bed if bed else os.path.join(tempdir, "alignment.bed")
@@ -213,11 +213,11 @@ def get(
         # Now we need to determine which point to start the calculation...
         for fp, argname in zip([bed, bam, sam], ["bed", "bam", "sam"]):
             step = "full"
-            if os.path.exists(fp):
+            if os.path.exists(fp) and os.path.getsize(out):
                 step = f"{argname}_exists"
                 break
 
-        if (not fwd_reads or not rev_reads) and step == "full":
+        if ((not fwd_reads or not rev_reads) and not se_reads) and step == "full":
             raise ValueError(
                 f"fwd_reads and rev_reads are required if no other alignments are specified!"
             )
@@ -227,8 +227,6 @@ def get(
             if calculation.__name__ == "parse_bed":
                 return calculation()
             calculation()
-    finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
 
 
 def main():

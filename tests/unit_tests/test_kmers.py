@@ -30,11 +30,25 @@ import os
 import pandas
 from unittest.mock import patch, MagicMock
 
-from io import StringIO, BytesIO
 from autometa.common import kmers
-from autometa.common.exceptions import KmerFormatError, KmerEmbeddingError
+from autometa.common.exceptions import TableFormatError
 
 assembly = os.path.join("tests", "data", "metagenome.fna")
+test_df = pandas.DataFrame(
+    {
+        "contig": [
+            "NODE_1_length_1389215_cov_225.275",
+            "NODE_2_length_1166739_cov_224.155",
+            "NODE_3_length_1063064_cov_225.095",
+            "NODE_4_length_1031470_cov_223.812",
+            "NODE_5_length_937195_cov_225.122",
+        ],
+        "AAAAA": [170, 1688, 143, 347, 156],
+        "AAAAG": [412, 1354, 345, 331, 317],
+        "AAATG": [536, 1513, 286, 325, 378],
+    }
+)
+test_df.set_index("contig", inplace=True)
 
 
 def test_revcomp():
@@ -72,93 +86,166 @@ def test_load(patched_file_size):
     )
     with pytest.raises(FileNotFoundError):
         kmers.load("kmer_fpath")
-    with pytest.raises(KmerFormatError):
+    with pytest.raises(TableFormatError):
         kmers.load(kmer_table_fpath)
-        assert patched_file_size.called is True
+    assert patched_file_size.called is True
 
 
-# def test_seq_counter():
-#     ref_kmers = kmers.init_kmers()
-#     kmer_counts = kmers.seq_counter(
-#         assembly=assembly, ref_kmers=ref_kmers, verbose=True
-#     )
-#     assert type(kmer_counts) is dict
-
-
-@patch("test_kmers.kmers.normalize")
 @patch("test_kmers.kmers.seq_counter")
 @patch("test_kmers.kmers.mp_counter")
-def test_count(pacthed_map_counter, pacthed_seq_counter, patched_normalize):
+def test_count(pacthed_mp_counter, pacthed_seq_counter):
     with pytest.raises(TypeError):
-        kmers.count(assembly=assembly, kmer_size=5.5)
+        kmers.count(assembly=assembly, size=5.5)
     with pytest.raises(TypeError):
-        kmers.count(assembly=assembly, kmer_size="5.5")
+        kmers.count(assembly=assembly, size="5.5")
 
-    out_df = kmers.count(assembly=assembly, kmer_size=5.0)
-    assert type(out_df) is pd.DataFrame
+    out_df = kmers.count(assembly=assembly, size=5.0)
+    assert type(out_df) is pandas.DataFrame
     assert out_df.index.name == "contig"
     assert len(list(out_df)) == 512
 
-    out_df = kmers.count(assembly=assembly, kmer_size=5, multiprocess=False)
-    assert type(out_df) is pd.DataFrame
+    out_df = kmers.count(assembly=assembly, size=5, multiprocess=False)
+    assert type(out_df) is pandas.DataFrame
     assert out_df.index.name == "contig"
     assert len(list(out_df)) == 512
 
-    out_df = kmers.count(assembly=assembly, kmer_size="5.0", normalized=True)
-
-    assert pacthed_map_counter.call_count == 2
+    assert pacthed_mp_counter.call_count == 1
     assert pacthed_seq_counter.call_count == 1
-    assert patched_normalize.call_count == 1
 
 
-# @patch("pd.DataFrame.empty", return_value=False)
-# def test_embed():
-#     kmer_fpath = MagicMock(
-#         return_value="path_to_kmers_file", name="path to kmer frequency table",
-#     )
+@patch("test_kmers.kmers.autometa_clr", side_effect=kmers.autometa_clr)
+def test_normalize(pacthed_autometa_clr):
+    out_fpath = MagicMock(
+        return_value="path_to_output_table", name="path to input kmer normalised table",
+    )
+    # with patch("test_kmers.kmers.autometa_clr", kmers.autometa_clr):
+    norm_df = kmers.normalize(df=test_df)
+    assert type(norm_df) is pandas.DataFrame
+    assert norm_df.index.name == "contig"
+    assert list(norm_df) == ["AAAAA", "AAAAG", "AAATG"]
+    assert round((norm_df.iloc[2, 2]), 2) == 0.17
+    assert round((norm_df.iloc[3, 1]), 2) == -0.01
 
-#     with pytest.raises(KmerEmbeddingError):
-#         kmers.embed(kmers=None, embedded=None)
+    norm_df = kmers.normalize(df=test_df, out="out_table")
+    assert type(norm_df) is pandas.DataFrame
+    assert norm_df.index.name == "contig"
+    assert list(norm_df) == ["AAAAA", "AAAAG", "AAATG"]
+    assert round((norm_df.iloc[2, 2]), 2) == 0.17
+    assert round((norm_df.iloc[3, 1]), 2) == -0.01
+    os.remove("out_table")
 
-#     # with pytest.raises(ValueError):
-#     #     kmers.embed(kmers=kmer_fpath)
-#     # with patch(
-#     #     "pd.read_csv",
-#     #     return_value={"contig1": ["count1", "count2"], "contig2": ["count1", "count2"]},
-#     # ):
-#     #     kmers.embed(kmers=kmer_fpath)
-#     test_df = pd.DataFrame(
-#         {
-#             "contig": [
-#                 "NODE_1_length_1389215_cov_225.275",
-#                 "NODE_2_length_1166739_cov_224.155",
-#                 "NODE_3_length_1063064_cov_225.095",
-#                 "NODE_4_length_1031470_cov_223.812",
-#                 "NODE_5_length_937195_cov_225.122",
-#             ],
-#             "AAAAA": [170, 1688, 143, 347, 156],
-#             "AAAAG": [412, 1354, 345, 331, 317],
-#             "AAATG": [536, 1513, 286, 325, 378],
-#         }
-#     )
-#     output = BytesIO()
-#     writer = pd.ExcelWriter(output, engine="xlsxwriter")
-#     test_df.to_excel(writer, sheet_name="Sheet1", index=False)
-#     writer.save()
-#     output.seek(0)
+    norm_df = kmers.normalize(df=test_df, out=out_fpath, force=True)
+    assert type(norm_df) is pandas.DataFrame
+    assert norm_df.index.name == "contig"
+    assert list(norm_df) == ["AAAAA", "AAAAG", "AAATG"]
+    assert round((norm_df.iloc[2, 2]), 2) == 0.17
+    assert round((norm_df.iloc[3, 1]), 2) == -0.01
 
-#     kmer_fpath = MagicMock(return_value=output, name="path to kmer frequency table",)
-#     kmers.embed(kmers=test_df)
+    norm_df = kmers.normalize(df=test_df, method="ilr")
+    assert type(norm_df) is pandas.DataFrame
+    assert norm_df.index.name == "contig"
+    assert list(norm_df) == [0, 1]
+    assert round((norm_df.iloc[2, 1]), 2) == -0.21
+    assert round((norm_df.iloc[3, 0]), 2) == 0.03
+
+    norm_df = kmers.normalize(df=test_df, method="clr")
+    assert type(norm_df) is pandas.DataFrame
+    assert norm_df.index.name == "contig"
+    assert list(norm_df) == [0, 1, 2]
+    assert round((norm_df.iloc[2, 2]), 2) == 0.17
+    assert round((norm_df.iloc[3, 1]), 2) == -0.01
+
+    with pytest.raises(ValueError):
+        kmers.normalize(df=test_df, method="invalid_method")
+
+    assert pacthed_autometa_clr.call_count == 3
 
 
-# @patch("os.path.getsize", return_value=2 * 1024 * 1024)
-# @patch("pandas.DataFrame.empty", return_value=False)
-# def test_embed(patched_df_empty, patched_file_size):
-#     with pytest.raises(KmerEmbeddingError):
-#         kmers.embed(kmers=None, embedded=None)
+@patch("os.path.getsize", return_value=2 * 1024 * 1024)
+def test_embed(patched_file_size):
+    # spec is needed as it makes the instance of MagicMock to str, but if we use spec os.path.exists gives us False, thus we need to patch that
+    #  See https://stackoverflow.com/a/11283173/12671809
+    kmer_fpath = MagicMock(
+        return_value="path_to_kmers_file",
+        name="path to kmer frequency table",
+        spec="path_to_kmers_file",
+    )
+    out_fpath = MagicMock(
+        return_value="path_to_output_file", name="path to output table",
+    )
 
-#     kmer_fpath = MagicMock(
-#         return_value="path_to_kmers_file", name="path to kmer frequency table"
-#     )
+    with patch("os.path.exists", return_value=True) as mock_path:
+        with pytest.raises(TableFormatError):
+            kmers.embed(kmers=kmer_fpath)
+    assert mock_path.called is True
 
-#     kmers.embed(kmers=kmer_fpath)
+    with pytest.raises(TypeError):
+        kmers.embed(kmers="invalid_fpath")
+
+    normalized_test_df = kmers.normalize(df=test_df)
+    with pytest.raises(TableFormatError):
+        kmers.embed(kmers=normalized_test_df, out=out_fpath)
+
+    empty_df = pandas.DataFrame({})
+    with pytest.raises(FileNotFoundError):
+        kmers.embed(kmers=empty_df, out=out_fpath, force=True)
+
+    with pytest.raises(ValueError):
+        kmers.embed(kmers=normalized_test_df, method="invalid_method")
+    # Need to test if it raises value error while doing dimension reduction but not sure how to fail this step
+    # with pytest.raises(ValueError):
+    #     kmers.embed(kmers=normalized_test_df, method="bhsne", embed_dimensions=10)
+
+    kmers.embed(kmers=normalized_test_df, method="sksne", embed_dimensions=10)
+
+    embed_df = kmers.embed(kmers=normalized_test_df, method="bhsne")
+    assert type(embed_df) is pandas.DataFrame
+    assert embed_df.index.name == "contig"
+    assert list(embed_df) == ["x", "y"]
+    assert round((embed_df.iloc[2, 1]), 2) == -618.96
+    assert round((embed_df.iloc[4, 1]), 2) == 3395.94
+
+    embed_df = kmers.embed(kmers=normalized_test_df, out=out_fpath, force=True)
+    assert type(embed_df) is pandas.DataFrame
+    assert embed_df.index.name == "contig"
+    assert list(embed_df) == ["x", "y"]
+    assert round((embed_df.iloc[2, 1]), 2) == -618.96
+    assert round((embed_df.iloc[4, 1]), 2) == 3395.94
+
+    embed_df = kmers.embed(kmers=normalized_test_df, embed_dimensions=2, method="sksne")
+    # Coversion to float64 is needed for sksne and umap as in these cases the DataFrame returns values which are in float32, and thus can't be compared with normal float.
+    embed_df = embed_df.astype("float64")
+    assert type(embed_df) is pandas.DataFrame
+    assert embed_df.index.name == "contig"
+    assert list(embed_df) == ["x", "y"]
+    assert round((embed_df.iloc[2, 1]), 2) == -667.56
+    assert round((embed_df.iloc[4, 1]), 2) == -957.08
+
+    embed_df_10_dim = kmers.embed(
+        kmers=normalized_test_df, embed_dimensions=10, method="sksne"
+    )
+    embed_df_10_dim = embed_df_10_dim.astype("float64")
+    assert type(embed_df_10_dim) is pandas.DataFrame
+    assert embed_df_10_dim.index.name == "contig"
+    assert list(embed_df_10_dim) == ["x", "y", "z"]
+    assert round((embed_df_10_dim.iloc[2, 1]), 2) == 412.51
+    assert round((embed_df_10_dim.iloc[4, 1]), 2) == -911.67
+
+    embed_df = kmers.embed(kmers=normalized_test_df, embed_dimensions=3, method="sksne")
+    embed_df = embed_df.astype("float64")
+    assert type(embed_df) is pandas.DataFrame
+    assert embed_df.index.name == "contig"
+    assert list(embed_df) == ["x", "y", "z"]
+    assert round((embed_df.iloc[2, 1]), 2) == 412.51
+    assert round((embed_df.iloc[4, 1]), 2) == -911.67
+    pandas.testing.assert_frame_equal(embed_df_10_dim, embed_df)
+
+    embed_df = kmers.embed(kmers=normalized_test_df, embed_dimensions=2, method="umap")
+    embed_df = embed_df.astype("float64")
+    assert type(embed_df) is pandas.DataFrame
+    assert embed_df.index.name == "contig"
+    assert list(embed_df) == ["x", "y"]
+    assert round((embed_df.iloc[2, 1]), 2) == -5.2
+    assert round((embed_df.iloc[4, 1]), 2) == -4.28
+
+    assert patched_file_size.call_count == 4

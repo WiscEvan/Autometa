@@ -129,7 +129,7 @@ def load(kmers_fpath):
         raise FileNotFoundError(kmers_fpath)
     try:
         df = pd.read_csv(kmers_fpath, sep="\t", index_col="contig")
-    except ValueError:
+    except (ValueError, TypeError):
         raise TableFormatError(f"contig column not found in {kmers_fpath}!")
     return df
 
@@ -310,14 +310,15 @@ def count(
         `size` must be an int
 
     """
-    # checks if it is something like 12.0 vs. 12.9. Also check is an int has been passed as a string, like "5.0"
-    if not float(kmer_size).is_integer():
-        raise TypeError(f"kmer_size must be an int! Given: {type(kmer_size)}")
-    ref_kmers = init_kmers(kmer_size)
-    if assembly.endswith(".gz"):
-        assembly = gunzip(assembly, assembly.rstrip(".gz"))
-    if multiprocess:
-        if not isinstance(size, int):
+    out_specified = out is not None
+    out_exists = os.path.exists(out) if out else False
+    case1 = out_specified and out_exists and not force
+    if case1:
+        logger.warning(f"counts already exist: {out} force to overwrite. [retrieving]")
+        df = pd.read_csv(out, sep="\t", index_col="contig")
+    else:
+        # checks if it is something like 12.0 vs. 12.9. Also check is an int
+        if not float(size).is_integer():
             raise TypeError(f"size must be an int! Given: {type(size)}")
         ref_kmers = init_kmers(size)
         if assembly.endswith(".gz"):
@@ -496,25 +497,26 @@ def embed(
     """
     if isinstance(kmers, str) and os.path.exists(kmers) and os.path.getsize(kmers):
         try:
-            print("hiiiiiiiiiiiiiiiiiiiiiiiii")
             df = pd.read_csv(kmers, sep="\t", index_col="contig")
-        except ValueError:
+        except (ValueError, TypeError):
             raise TableFormatError(f"contig column not found in {kmers}")
     elif isinstance(kmers, pd.DataFrame):
         df = kmers
     else:
-        TypeError(kmers)
+        raise TypeError(kmers)
+
     if out and os.path.exists(out) and os.path.getsize(out) and not force:
         logger.debug(f"k-mers frequency embedding already exists {out}")
         try:
             return pd.read_csv(out, sep="\t", index_col="contig")
-        except ValueError:
+        except (ValueError, TypeError):
             raise TableFormatError(f"contig column not found in {out}")
 
     if df.empty:
         kmers_desc = f"kmers:{kmers} type:{type(kmers)}"
         embed_desc = f"out:{out} type:{type(out)}"
-        requirements = f"kmers type must be a pd.DataFrame or filepath."
+        requirements = f"Given pd.DataFrame is empty!"
+        # requirements = f"kmers type must be a pd.DataFrame or filepath."
         raise FileNotFoundError(f"{kmers_desc} {embed_desc} {requirements}")
 
     method = method.lower()
