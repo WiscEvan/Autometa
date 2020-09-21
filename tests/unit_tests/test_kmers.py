@@ -55,22 +55,22 @@ def test_revcomp():
     string = "AAATTGCGCCCCCG"
     rev_string = kmers._revcomp(string)
     assert rev_string == "CGGGGGCGCAATTT"
-    assert type(rev_string) is str
+    assert isinstance(rev_string, str)
     assert len(rev_string) == 14
 
 
 def test_init_kmers():
     unique_kmers_5 = kmers.init_kmers(kmer_size=5)
-    assert type(unique_kmers_5) is dict
+    assert isinstance(unique_kmers_5, dict)
     assert len(unique_kmers_5) == 512
     unique_kmers_3 = kmers.init_kmers(kmer_size=3.0)
-    assert type(unique_kmers_3) is dict
+    assert isinstance(unique_kmers_3, dict)
     assert len(unique_kmers_3) == 32
     unique_kmers_5 = kmers.init_kmers(kmer_size="5")
-    assert type(unique_kmers_5) is dict
+    assert isinstance(unique_kmers_5, dict)
     assert len(unique_kmers_5) == 512
     unique_kmers_3 = kmers.init_kmers(kmer_size="3.0")
-    assert type(unique_kmers_3) is dict
+    assert isinstance(unique_kmers_3, dict)
     assert len(unique_kmers_3) == 32
     with pytest.raises(TypeError):
         kmers.init_kmers(kmer_size=5.5)
@@ -94,18 +94,17 @@ def test_load(patched_file_size):
 @patch("autometa.common.kmers.seq_counter")
 @patch("autometa.common.kmers.mp_counter")
 def test_count(pacthed_mp_counter, pacthed_seq_counter):
-    with pytest.raises(TypeError):
-        kmers.count(assembly=assembly, size=5.5)
-    with pytest.raises(TypeError):
-        kmers.count(assembly=assembly, size="5.5")
+    for size in [5.5, "5.5"]:
+        with pytest.raises(TypeError):
+            kmers.count(assembly=assembly, size=size)
 
     out_df = kmers.count(assembly=assembly, size=5.0)
-    assert type(out_df) is pd.DataFrame
+    assert isinstance(out_df, pd.DataFrame)
     assert out_df.index.name == "contig"
     assert out_df.shape == (0, 512)
 
     out_df = kmers.count(assembly=assembly, size=5, multiprocess=False)
-    assert type(out_df) is pd.DataFrame
+    assert isinstance(out_df, pd.DataFrame)
     assert out_df.index.name == "contig"
     assert out_df.shape == (0, 512)
 
@@ -119,7 +118,7 @@ def test_normalize(pacthed_autometa_clr, tmpdir):
         return_value="path_to_output_table", name="path to input kmer normalised table",
     )
     norm_df = kmers.normalize(df=test_df)
-    assert type(norm_df) is pd.DataFrame
+    assert isinstance(norm_df, pd.DataFrame)
     assert norm_df.index.name == "contig"
     assert list(norm_df) == ["AAAAA", "AAAAG", "AAATG"]
     assert round((norm_df.iloc[2, 2]), 2) == 0.17
@@ -127,7 +126,7 @@ def test_normalize(pacthed_autometa_clr, tmpdir):
     assert norm_df.shape == (5, 3)
 
     norm_df = kmers.normalize(df=test_df, out=tmpdir.join("out_table"))
-    assert type(norm_df) is pd.DataFrame
+    assert isinstance(norm_df, pd.DataFrame)
     assert norm_df.index.name == "contig"
     assert list(norm_df) == ["AAAAA", "AAAAG", "AAATG"]
     assert round((norm_df.iloc[2, 2]), 2) == 0.17
@@ -135,7 +134,7 @@ def test_normalize(pacthed_autometa_clr, tmpdir):
     assert norm_df.shape == (5, 3)
 
     norm_df = kmers.normalize(df=test_df, out=out_fpath, force=True)
-    assert type(norm_df) is pd.DataFrame
+    assert isinstance(norm_df, pd.DataFrame)
     assert norm_df.index.name == "contig"
     assert list(norm_df) == ["AAAAA", "AAAAG", "AAATG"]
     assert round((norm_df.iloc[2, 2]), 2) == 0.17
@@ -143,7 +142,7 @@ def test_normalize(pacthed_autometa_clr, tmpdir):
     assert norm_df.shape == (5, 3)
 
     norm_df = kmers.normalize(df=test_df, method="ilr")
-    assert type(norm_df) is pd.DataFrame
+    assert isinstance(norm_df, pd.DataFrame)
     assert norm_df.index.name == "contig"
     assert list(norm_df) == [0, 1]
     assert round((norm_df.iloc[2, 1]), 2) == -0.21
@@ -151,7 +150,7 @@ def test_normalize(pacthed_autometa_clr, tmpdir):
     assert norm_df.shape == (5, 2)
 
     norm_df = kmers.normalize(df=test_df, method="clr")
-    assert type(norm_df) is pd.DataFrame
+    assert isinstance(norm_df, pd.DataFrame)
     assert norm_df.index.name == "contig"
     assert list(norm_df) == [0, 1, 2]
     assert round((norm_df.iloc[2, 2]), 2) == 0.17
@@ -202,7 +201,7 @@ def test_embed(patched_file_size):
     kmers.embed(kmers=normalized_test_df, method="sksne", embed_dimensions=10)
 
     embed_df = kmers.embed(kmers=normalized_test_df, method="bhsne")
-    assert type(embed_df) is pd.DataFrame
+    assert isinstance(embed_df, pd.DataFrame)
     assert embed_df.index.name == "contig"
     assert list(embed_df) == ["x", "y"]
     assert round((embed_df.iloc[2, 1]), 2) == -618.96
@@ -210,7 +209,7 @@ def test_embed(patched_file_size):
     assert embed_df.shape == (5, 2)
 
     embed_df = kmers.embed(kmers=normalized_test_df, out=out_fpath, force=True)
-    assert type(embed_df) is pd.DataFrame
+    assert isinstance(embed_df, pd.DataFrame)
     assert embed_df.index.name == "contig"
     assert list(embed_df) == ["x", "y"]
     assert round((embed_df.iloc[2, 1]), 2) == -618.96
@@ -220,7 +219,7 @@ def test_embed(patched_file_size):
     embed_df = kmers.embed(kmers=normalized_test_df, embed_dimensions=2, method="sksne")
     # Coversion to float64 is needed for sksne and umap as in these cases the DataFrame returns values which are in float32, and thus can't be compared with normal float.
     embed_df = embed_df.astype("float64")
-    assert type(embed_df) is pd.DataFrame
+    assert isinstance(embed_df, pd.DataFrame)
     assert embed_df.index.name == "contig"
     assert list(embed_df) == ["x", "y"]
     assert round((embed_df.iloc[2, 1]), 2) == -667.56
@@ -231,7 +230,7 @@ def test_embed(patched_file_size):
         kmers=normalized_test_df, embed_dimensions=10, method="sksne"
     )
     embed_df_10_dim = embed_df_10_dim.astype("float64")
-    assert type(embed_df_10_dim) is pd.DataFrame
+    assert isinstance(embed_df_10_dim, pd.DataFrame)
     assert embed_df_10_dim.index.name == "contig"
     assert list(embed_df_10_dim) == ["x", "y", "z"]
     assert round((embed_df_10_dim.iloc[2, 1]), 2) == 412.51
@@ -240,7 +239,7 @@ def test_embed(patched_file_size):
 
     embed_df = kmers.embed(kmers=normalized_test_df, embed_dimensions=3, method="sksne")
     embed_df = embed_df.astype("float64")
-    assert type(embed_df) is pd.DataFrame
+    assert isinstance(embed_df, pd.DataFrame)
     assert embed_df.index.name == "contig"
     assert list(embed_df) == ["x", "y", "z"]
     assert round((embed_df.iloc[2, 1]), 2) == 412.51
@@ -250,7 +249,7 @@ def test_embed(patched_file_size):
 
     embed_df = kmers.embed(kmers=normalized_test_df, embed_dimensions=2, method="umap")
     embed_df = embed_df.astype("float64")
-    assert type(embed_df) is pd.DataFrame
+    assert isinstance(embed_df, pd.DataFrame)
     assert embed_df.index.name == "contig"
     assert list(embed_df) == ["x", "y"]
     assert round((embed_df.iloc[2, 1]), 2) == -5.2

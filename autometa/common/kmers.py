@@ -227,7 +227,7 @@ def seq_counter(assembly, ref_kmers, verbose=True):
     Returns
     -------
     dict
-        {contig:[count,count,...]} count index is respective to ref_kmers keys()
+        {contig:[count,count,...]} count index is respective to ref_kmers.keys()
 
     """
     n_uniq_kmers = len(ref_kmers)
@@ -516,7 +516,6 @@ def embed(
         kmers_desc = f"kmers:{kmers} type:{type(kmers)}"
         embed_desc = f"out:{out} type:{type(out)}"
         requirements = f"Given pd.DataFrame is empty!"
-        # requirements = f"kmers type must be a pd.DataFrame or filepath."
         raise FileNotFoundError(f"{kmers_desc} {embed_desc} {requirements}")
 
     method = method.lower()

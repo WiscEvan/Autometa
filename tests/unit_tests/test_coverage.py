@@ -49,7 +49,7 @@ def test_from_spades_names():
     assert len(coverages) == 3587
     assert coverages.index.name == "contig"
     assert coverages.name == "coverage"
-    assert type(coverages) is pd.core.series.Series
+    assert isinstance(coverages, pd.core.series.Series)
     assert coverages.dtypes == "float64"
     for cov in coverages.index:
         assert float(cov.split("_cov_")[-1]) == coverages[cov]
@@ -60,7 +60,7 @@ def test_make_length_table(make_temp_dir):
     # See https://stackoverflow.com/a/27034002/12671809
     out_fpath = str(make_temp_dir.join("out"))
     len_table = coverage.make_length_table(fasta=assembly, out=out_fpath)
-    assert type(len_table) is str
+    assert isinstance(len_table, str)
 
 
 @patch("os.path.getsize", return_value=2 * 1024 * 1024)
@@ -119,7 +119,7 @@ def test_get(
 
     assert len(out_df) == 3425
     assert out_df.index.name == "contig"
-    assert type(out_df) is pd.DataFrame
+    assert isinstance(out_df, pd.DataFrame)
     assert out_df.coverage.dtypes == "float64"
     assert list(out_df)[0] == "coverage"
     assert out_df.shape == (3425, 1)

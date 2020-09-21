@@ -88,5 +88,5 @@ def test_call_orfs(patched_progial_run, init_Metagenome):
 
     nucls_fp, prots_fp = init_Metagenome.call_orfs()
     assert patched_progial_run.call_count == 1
-    assert type(nucls_fp) is str
-    assert type(prots_fp) is str
+    assert isinstance(nucls_fp, str)
+    assert isinstance(prots_fp, str)
