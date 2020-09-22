@@ -82,9 +82,8 @@ def init_kmers(kmer_size=5):
         {kmer:index, ...}
 
     """
-    if not float(kmer_size).is_integer():
+    if not isinstance(kmer_size, int):
         raise TypeError(f"kmer_size must be an int! Given: {type(kmer_size)}")
-    kmer_size = int(float(kmer_size))
     index = 0
     uniq_kmers = dict()
     dna_letters = ["A", "T", "C", "G"]
@@ -318,7 +317,7 @@ def count(
         df = pd.read_csv(out, sep="\t", index_col="contig")
     else:
         # checks if it is something like 12.0 vs. 12.9. Also check is an int
-        if not float(size).is_integer():
+        if not isinstance(size, int):
             raise TypeError(f"size must be an int! Given: {type(size)}")
         ref_kmers = init_kmers(size)
         if assembly.endswith(".gz"):

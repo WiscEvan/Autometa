@@ -1,7 +1,11 @@
 import pytest
+import os
 import pandas as pd
 from Bio import SeqIO
+
 from autometa.common import kmers
+from unittest.mock import patch, MagicMock
+from autometa.common.exceptions import TableFormatError
 
 # TODO: from autometa.datasets import download_test_data()
 
@@ -48,6 +52,21 @@ def test_kmer_load(counts_fpath):
     assert df.index.name == "contig"
 
 
+def test_kmer_load_FileNotFoundError():
+    with pytest.raises(FileNotFoundError):
+        kmers.load(kmers_fpath="Invalid_fpath")
+
+
+def test_kmer_load_TableFormatError(tmp_path):
+    kmer_fpath = MagicMock(
+        return_value="path_to_kmer_frequency_table",
+        name="path to input kmer frequency table",
+    )
+    with patch("os.path.getsize", return_value=2 * 1024 * 1024):
+        with pytest.raises(TableFormatError):
+            kmers.load(kmer_fpath)
+
+
 @pytest.mark.parametrize("multiprocess", [True, False])
 def test_count(small_metagenome, multiprocess, tmp_path):
     out = tmp_path / "kmers.tsv"
@@ -78,11 +97,10 @@ def test_count_out_exists(small_metagenome, counts, force, tmp_path):
     assert out.exists()
 
 
-def test_count_wrong_size(small_metagenome, tmp_path):
-    out = tmp_path / "kmers.tsv"
+def test_count_wrong_size(small_metagenome):
     size = 5.5
     with pytest.raises(TypeError):
-        df = kmers.count(assembly=small_metagenome, size=size)
+        kmers.count(assembly=small_metagenome, size=size)
 
 
 @pytest.mark.parametrize("method", ["am_clr", "clr", "ilr"])
@@ -110,7 +128,7 @@ def test_normalize_out_exists(counts, norm_df, force, tmp_path):
 def test_normalize_wrong_method(counts, tmp_path):
     out = tmp_path / "kmers.norm.tsv"
     with pytest.raises(ValueError):
-        df = kmers.normalize(df=counts, method="am_ilr", out=out, force=False)
+        kmers.normalize(df=counts, method="am_ilr", out=out, force=False)
 
 
 @pytest.mark.parametrize("method", ["bhsne", "sksne", "umap"])
@@ -163,3 +181,29 @@ def test_embed_out_exists(norm_df, tmp_path):
         method=method,
         seed=seed,
     )
+
+
+@patch("os.path.getsize", return_value=2 * 1024 * 1024)
+def test_embed_TableFormatError(pacthed_file_size, tmp_path):
+    kmer_fpath = MagicMock(
+        return_value="path_to_kmer_frequency_table",
+        name="path to input kmer frequency table",
+        spec="path_to_kmers_file",
+    )
+    with patch("os.path.exists", return_value=True):
+        with pytest.raises(TableFormatError):
+            kmers.embed(kmers=kmer_fpath)
+
+
+def test_embed_TypeError(tmp_path):
+    kmer_fpath = tmp_path / "kmers.embed.tsv"
+    with pytest.raises(TypeError):
+        kmers.embed(kmers=kmer_fpath)
+
+
+@patch("os.path.getsize", return_value=2 * 1024 * 1024)
+def test_embed_FileNotFoundError(pacthed_file_size, tmp_path):
+    empty_df = pd.DataFrame({})
+    out = tmp_path / "kmers.embed.tsv"
+    with pytest.raises(FileNotFoundError):
+        kmers.embed(kmers=empty_df, out=out, force=True)

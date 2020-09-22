@@ -334,10 +334,10 @@ class Metagenome:
         FileExistsError
             filepath consisting of sequences that passed filter already exists
         """
-        try:
-            cutoff = float(cutoff)
-        except ValueError:
-            raise ValueError(f"Cutoff should be flaot of int, specified {cutoff}")
+
+        if not isinstance(cutoff, numbers.Number) or isinstance(cutoff, bool):
+            # https://stackoverflow.com/a/4187220/13118765
+            raise TypeError(f"cutoff: {cutoff} must be a float or int")
         if cutoff <= 0:
             raise ValueError(f"cutoff: {cutoff} must be a positive real number")
         if os.path.exists(out) and not force:

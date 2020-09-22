@@ -1,4 +1,5 @@
 import pytest
+import os
 
 from autometa.common.metagenome import Metagenome
 from autometa.common.external import prodigal
@@ -76,9 +77,7 @@ def test_length_filter(metagenome, tmp_path):
 def test_length_filter_filtered_exists(metagenome):
     existing = str(metagenome)
     with pytest.raises(FileExistsError):
-        filtered_metagenome = metagenome.length_filter(
-            out=existing, cutoff=7000, force=False
-        )
+        metagenome.length_filter(out=existing, cutoff=7000, force=False)
 
 
 def test_length_filter_overwrite(metagenome):
@@ -94,10 +93,9 @@ def test_length_filter_overwrite(metagenome):
 )
 def test_length_filter_invalid_cutoff(metagenome, cutoff, expected_error, tmp_path):
     out = tmp_path / "length_filtered.fna"
+    print(cutoff, "\n", expected_error)
     with pytest.raises(expected_error):
-        filtered_metagenome = metagenome.length_filter(
-            out=out, cutoff=cutoff, force=False
-        )
+        metagenome.length_filter(out=out, cutoff=cutoff, force=False)
 
 
 def test_call_orfs(metagenome, mock_prodigal_run):
