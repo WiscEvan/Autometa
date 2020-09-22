@@ -29,8 +29,6 @@ def fixture_metagenome(variables, tmp_path):
 # Then group fixtures into a group and indirectly parametrize group
 # i.e. alignments.sam, alignments.bam, alignments.bed, fwd_reads.fq, rev_reads.fq
 # The external tools could be run or we could monkeypatch these.
-
-
 @pytest.mark.wip
 def test_coverage_get_from_spades(small_metagenome, tmp_path):
     out = tmp_path / "covs_from_spades.tsv"
