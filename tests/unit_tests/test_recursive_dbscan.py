@@ -80,6 +80,7 @@ def test_resursive_dbscan(markers_df, domain, verbose, embed_kmers, tmp_path):
     assert len(out_failed) + len(out_passed) == 50
     assert out_passed.empty
     assert out_failed.index.name == "contig"
+    assert isinstance(out_failed, pd.DataFrame)
 
 
 # @pytest.mark.skip
@@ -105,6 +106,7 @@ def test_recursive_hdbscan(markers_df, domain, verbose, embed_kmers, tmp_path):
     assert len(out_failed) + len(out_passed) == 50
     assert out_passed.empty
     assert out_failed.index.name == "contig"
+    assert isinstance(out_failed, pd.DataFrame)
 
 
 # @pytest.mark.skip
@@ -127,3 +129,7 @@ def test_binning(markers_df, domain, verbose, reverse_ranks, embed_kmers, tmp_pa
         verbose=verbose,
         reverse_ranks=reverse_ranks,
     )
+    assert len(out) == 50
+    assert out.index.name == "contig"
+    # print(type(out))
+    assert isinstance(out, pd.DataFrame)
