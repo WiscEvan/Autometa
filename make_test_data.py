@@ -1,4 +1,6 @@
 import json
+import subprocess
+import os
 
 import pandas as pd
 
@@ -42,6 +44,9 @@ class TestData:
     blastp_fpath = attr.ib(validator=attr.validators.instance_of(str))
     blastp_orfs_fpath = attr.ib(validator=attr.validators.instance_of(str))
     data = attr.ib(factory=dict)
+    sam_fpath = attr.ib(validator=attr.validators.instance_of(str))
+    bam_fpath = attr.ib(validator=attr.validators.instance_of(str))
+    bed_fpath = attr.ib(validator=attr.validators.instance_of(str))
 
     def get_kmers(self):
         print("Preparing kmer counts test data...")
@@ -124,11 +129,34 @@ class TestData:
         }
 
     def get_coverage(self):
+        out_bam_fpath = "records_bam.txt"
+        cmd = f"samtools view {self.bam_fpath} > {out_bam_fpath}"
+        subprocess.run(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            shell=True,
+            check=True,
+        )
+
+        def get_alignment_records(fpath):
+            alignment_records = {}
+            with open(fpath) as fh:
+                for line in fh:
+                    line = line.strip()
+                    line = line.split("\t")
+                    alignment_records[line[0]] = line[1:]
+            return alignment_records
+
+        print("Making alignment records ...")
+
         self.data["coverage"] = {
             "spades_records": self.records_fpath,
-            "bam": "alignments.bam",
-            "sam": "alignments.sam",
+            "bed": get_alignment_records(self.bed_fpath),
+            "bam": get_alignment_records(out_bam_fpath),
+            "sam": get_alignment_records(self.sam_fpath),
         }
+        os.remove(out_bam_fpath)
 
     def to_json(self, out: str):
         print(f"Serializing data to {out}")
@@ -152,6 +180,9 @@ def main():
     # blastp_fpath = outdir / "metagenome.filtered.orfs.dmnd.blastp"
     blastp_orfs_fpath = "tests/data/metagenome.filtered.orfs.faa"
     # blastp_orfs_fpath = outdir / "metagenome.filtered.orfs.faa"
+    sam_fpath = "tests/data/records.sam"
+    bam_fpath = "tests/data/records.bam"
+    bed_fpath = "tests/data/records.bed"
 
     test_data = TestData(
         records_fpath=records_fpath,
@@ -160,6 +191,9 @@ def main():
         ncbi_dirpath=ncbi_dirpath,
         blastp_fpath=blastp_fpath,
         blastp_orfs_fpath=blastp_orfs_fpath,
+        sam_fpath=sam_fpath,
+        bam_fpath=bam_fpath,
+        bed_fpath=bed_fpath,
     )
 
     # TODO: Decrease the size of the test_data.json file by only using
