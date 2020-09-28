@@ -4,6 +4,7 @@ import pandas as pd
 
 from autometa.binning import recursive_dbscan
 from autometa.common import kmers
+from autometa.common.exceptions import TableFormatError
 
 
 @pytest.fixture(name="bacteria_markers")
@@ -35,101 +36,124 @@ def fixture_norm_df(variables):
 
 
 @pytest.fixture(name="embed_kmers")
-def test_embed(norm_df, tmpdir):
+def fixture_embed_df(norm_df, tmpdir):
     embed_table = tmpdir.join("embed_table")
     df = kmers.embed(kmers=norm_df, out=embed_table)
     return df
 
 
-@pytest.fixture(name="markers_df")
-def fixture_markers_fpath(request, bacteria_markers, archaea_markers):
-    kingdom = request.param
-    markers_df = {
-        "bacteria_markers": bacteria_markers,
-        "archaea_markers": archaea_markers,
+@pytest.fixture(name="df_without_markers")
+def fixture_empty_df():
+    invalid_dict = {
+        "contig": ["invalid_contig_1", "invalid_contig_2", "invalid_contig_3"],
+        "markers": ["invalid_marker1", "invalid_marker2", "invalid_marker3"],
     }
-    return markers_df[kingdom]
+    df = pd.DataFrame(invalid_dict)
+    return df
 
 
-# @pytest.mark.parametrize(
-#     "markers_df, domain",
-#     [("bacteria_markers", "bacteria"), ("archaea_markers", "archaea"),],
-# )
-
-# @pytest.mark.parametrize(
-#     "markers_df", ["bacteria_markers", "archaea_markers"],
-# )
-# @pytest.mark.skip
-@pytest.mark.parametrize("domain, verbose", [("bacteria", True), ("archaea", False)])
-@pytest.mark.parametrize(
-    "markers_df",
-    [pytest.param("bacteria_markers"), pytest.param("archaea_markers"),],
-    indirect=True,
-)
-def test_resursive_dbscan(markers_df, domain, verbose, embed_kmers, tmp_path):
-    out_passed = tmp_path / "passed_contigs.tsv"
-    out_failed = tmp_path / "failed_contigs.tsv"
-    out_passed, out_failed = recursive_dbscan.recursive_dbscan(
-        table=embed_kmers,
-        markers_df=markers_df,
-        domain=domain,
-        completeness_cutoff=20,
-        purity_cutoff=90,
-        verbose=verbose,
-    )
-    assert len(out_failed) + len(out_passed) == 50
-    assert out_passed.empty
-    assert out_failed.index.name == "contig"
-    assert isinstance(out_failed, pd.DataFrame)
-
-
-# @pytest.mark.skip
-@pytest.mark.parametrize(
-    "domain, verbose", [("bacteria", True), ("archaea", False)],
-)
-@pytest.mark.parametrize(
-    "markers_df",
-    [pytest.param("bacteria_markers"), pytest.param("archaea_markers"),],
-    indirect=True,
-)
-def test_recursive_hdbscan(markers_df, domain, verbose, embed_kmers, tmp_path):
-    out_passed = tmp_path / "passed_contigs.tsv"
-    out_failed = tmp_path / "failed_contigs.tsv"
-    out_passed, out_failed = recursive_dbscan.recursive_hdbscan(
-        table=embed_kmers,
-        markers_df=markers_df,
-        domain="bacteria",
-        completeness_cutoff=20,
-        purity_cutoff=90,
-        verbose=verbose,
-    )
-    assert len(out_failed) + len(out_passed) == 50
-    assert out_passed.empty
-    assert out_failed.index.name == "contig"
-    assert isinstance(out_failed, pd.DataFrame)
-
-
-# @pytest.mark.skip
-@pytest.mark.parametrize(
-    "domain, verbose,reverse_ranks",
-    [("bacteria", True, True), ("archaea", False, False)],
-)
-@pytest.mark.parametrize(
-    "markers_df",
-    [pytest.param("bacteria_markers"), pytest.param("archaea_markers"),],
-    indirect=True,
-)
-def test_binning(markers_df, domain, verbose, reverse_ranks, embed_kmers, tmp_path):
+# @pytest.mark.parametrize("method, verbose", [("dbscan", True), ("hdbscan", False)])
+@pytest.mark.parametrize("verbose", [True, False])
+# @pytest.mark.parametrize("verbose, reverse_ranks", [(True, True), (False, False)])
+@pytest.mark.parametrize("method", ["dbscan", "hdbscan"])
+def test_binning_bacteria(tmp_path, bacteria_markers, embed_kmers, method, verbose):
     out = tmp_path / "output_table.tsv"
     out = recursive_dbscan.binning(
         master=embed_kmers,
-        markers=markers_df,
-        domain=domain,
+        markers=bacteria_markers,
+        domain="bacteria",
+        method=method,
         taxonomy=False,
+        reverse_ranks=True,
         verbose=verbose,
-        reverse_ranks=reverse_ranks,
     )
     assert len(out) == 50
     assert out.index.name == "contig"
-    # print(type(out))
     assert isinstance(out, pd.DataFrame)
+
+
+@pytest.mark.wip
+# @pytest.mark.parametrize("method, verbose", [("dbscan", True), ("hdbscan", False)])
+# @pytest.mark.parametrize("verbose", [True, False])
+# @pytest.mark.parametrize("verbose, reverse_ranks", [(True, True), (False, False)])
+@pytest.mark.parametrize("method", ["dbscan", "hdbscan"])
+def test_binning_taxonomy_true(tmp_path, bacteria_markers, embed_kmers, method):
+    out = tmp_path / "output_table.tsv"
+    out = recursive_dbscan.binning(
+        master=embed_kmers,
+        markers=bacteria_markers,
+        domain="bacteria",
+        method=method,
+        taxonomy=True,
+        reverse_ranks=True,
+    )
+    assert len(out) == 50
+    assert out.index.name == "contig"
+    assert isinstance(out, pd.DataFrame)
+
+
+def test_binning_empty_markers_table(
+    df_without_markers, embed_kmers,
+):
+    with pytest.raises(TableFormatError):
+        recursive_dbscan.binning(
+            master=embed_kmers,
+            markers=df_without_markers,
+            domain="bacteria",
+            method="hdbscan",
+            taxonomy=False,
+        )
+
+
+# @pytest.mark.parametrize("method", ["dbscan", "hdbscan"])
+# # @pytest.mark.parametrize("verbose", [True, False])
+# def test_binning_archaea(tmp_path, archaea_markers, embed_kmers, method):
+#     out = tmp_path / "output_table.tsv"
+#     out = recursive_dbscan.binning(
+#         master=embed_kmers,
+#         markers=archaea_markers,
+#         domain="archaea",
+#         method=method,
+#         taxonomy=False,
+#         verbose=False,
+#     )
+#     assert len(out) == 50
+#     assert out.index.name == "contig"
+#     # print(type(out))
+#     assert isinstance(out, pd.DataFrame)
+
+
+# @pytest.mark.skip
+# @pytest.mark.parametrize(
+#     "domain, verbose,reverse_ranks",
+#     [("bacteria", True, True, pytest.param("bacteria_markers")), ("archaea", False, False, pytest.param("archaea_markers"))],
+# )
+# # @pytest.mark.parametrize(
+# #     "markers_df",
+# #     [pytest.param("bacteria_markers"), pytest.param("archaea_markers"),],
+# #     indirect=True,
+# # )
+# @pytest.mark.parametrize(
+#     "markers_df",
+#     ["bacteria_markers", "archaea_markers"],
+#     indirect=True,
+# )
+# # @pytest.mark.parametrize(
+# #     "markers_df,domains",
+# #     [pytest.param("bacteria_markers"), pytest.param("archaea_markers"),],
+# #     indirect=True,
+# # )
+# def test_binning(markers_df, domain, verbose, reverse_ranks, embed_kmers, tmp_path):
+#     out = tmp_path / "output_table.tsv"
+#     out = recursive_dbscan.binning(
+#         master=embed_kmers,
+#         markers=markers_df,
+#         domain=domain,
+#         taxonomy=False,
+#         verbose=verbose,
+#         reverse_ranks=reverse_ranks,
+#     )
+#     assert len(out) == 50
+#     assert out.index.name == "contig"
+#     # print(type(out))
+#     assert isinstance(out, pd.DataFrame)

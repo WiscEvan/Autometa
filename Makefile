@@ -6,10 +6,10 @@ clean:
 
 cmd = --durations=0 --cov=autometa --emoji --cov-report html
 
-test-wip: tests/test_data.json
+test-wip: tests/data/test_data.json
 	python -m pytest -m "wip" ${cmd}
 
-test: tests/test_data.json
+test: tests/data/test_data.json
 	python -m pytest ${cmd}
 
 .Phony:

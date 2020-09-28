@@ -129,6 +129,8 @@ def assign(
     lca_fpath = lca_fpath if lca_fpath else os.path.join(tmpdir, "lca.tsv")
     hits = hits if hits else os.path.join(tmpdir, "hits.pkl.gz")
     blast = blast if blast else os.path.join(tmpdir, "blastp.tsv")
+    prot_orfs = prot_orfs if prot_orfs else os.path.join(tmpdir, "orfs.faa")
+    nucl_orfs = nucl_orfs if nucl_orfs else os.path.join(tmpdir, "orfs.ffn")
 
     def call_orfs():
         prodigal.run(
@@ -184,11 +186,12 @@ def assign(
     for fp, argname in zip(
         [lca_fpath, hits, blast, prot_orfs], ["lca", "lca", "lca", "orfs"],
     ):
+        print(fp)
         if os.path.exists(fp):
             step = f"{argname}_exists"
             break
 
-    if assembly and step == "full":
+    if not assembly and step == "full":
         raise ValueError(f"assembly is required if no other files are specified!")
 
     logger.debug(f"starting taxonomy assignment sequence from {step}")
@@ -437,7 +440,7 @@ def main():
     assign(
         method=args.method,
         outfpath=args.taxonomy,
-        fasta=args.assembly,
+        assembly=args.assembly,
         prot_orfs=args.prot_orfs,
         nucl_orfs=args.nucl_orfs,
         blast=args.blast,

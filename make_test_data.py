@@ -166,7 +166,7 @@ def main():
     # as few contigs as possible for each test case...
     test_data.get_kmers()
     test_data.get_coverage()
-    test_data.get_taxonomy()
+    # test_data.get_taxonomy()
     test_data.get_markers()
 
     out = "tests/data/test_data.json"

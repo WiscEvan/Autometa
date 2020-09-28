@@ -119,6 +119,7 @@ def fixture_assigned_vote_fpath(tmp_path):
     return tmp_path / "assigned_votes.tsv"
 
 
+@pytest.mark.skip
 @pytest.mark.wip
 def test_vote_assign(blastp, ncbi_dirpath, assigned_vote_fpath, prot_orfs, tmp_path):
     lca_fpath = tmp_path / "lca.tsv"

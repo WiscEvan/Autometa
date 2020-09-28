@@ -144,7 +144,8 @@ class Metagenome:
         """Retrieve SeqRecord objects from provided `assembly`.
 
         Returns
-        -------
+
+-------
         list
             [SeqRecord, SeqRecord, ...]
 

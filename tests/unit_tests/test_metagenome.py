@@ -112,7 +112,7 @@ def test_call_orfs(metagenome, mock_prodigal_run):
 
 
 @pytest.mark.parametrize(
-    "force,parallel,cpus", [(1, False, 1), (False, 1, 1), (False, False, False)],
+    "force,parallel,cpus", [(1, False, 1), (False, 1, 1), (False, False, False)]
 )
 def test_call_orfs_invalid_params(metagenome, force, parallel, cpus):
     with pytest.raises(TypeError):
@@ -125,7 +125,28 @@ def test_orfs_called(metagenome, monkeypatch):
     with monkeypatch.context():
         # Here we set the filepaths to the metagenome fixture assembly path
         # (since we know this exists and is non-empty)
+        # metagenome.__str__ == metagenome.assembly
         monkeypatch.setattr(metagenome, "prot_orfs_fpath", str(metagenome))
         monkeypatch.setattr(metagenome, "nucl_orfs_fpath", str(metagenome))
         called = metagenome.orfs_called
         assert called
+
+
+# @pytest.mark.skip
+# @pytest.mark.wip
+# @pytest.mark.entrypoint
+# def test_metagenome_main(monkeypatch):
+#     class MockNamespace:
+#         def __init__(self):
+#             self.force = False
+#             self.assembly = "path/to/assembly.fna"
+#             self.cutoff = 3000
+#             self.out = "path/to/assembly.filtered.fna"
+
+#     def return_mock_namespace():
+#         # These args will need to correspond to whatever main() function for module.
+#         # see setup.py console_scripts list for functions
+#         # construct args... and return
+#         return MockNamespace()
+#     monkeypatch.setattr(parser, "parse_args", return_mock_namespace)
+#     pass
