@@ -46,6 +46,18 @@ def fixture_norm_df(variables):
     return df
 
 
+@pytest.fixture(name="invalid_df_fpath")
+def fixture_df_without_contig_index_(tmp_path):
+    invalid_dict = {
+        "column1": ["invalid_contig_1", "invalid_contig_2", "invalid_contig_3"],
+        "column2": ["invalid_marker1", "invalid_marker2", "invalid_marker3"],
+    }
+    df = pd.DataFrame(invalid_dict)
+    df_fpath = tmp_path / "invalid_df.tsv"
+    df.to_csv(df_fpath)
+    return df_fpath.as_posix()
+
+
 def test_kmer_load(counts_fpath):
     df = kmers.load(kmers_fpath=counts_fpath)
     assert not df.empty
@@ -57,14 +69,9 @@ def test_kmer_load_FileNotFoundError():
         kmers.load(kmers_fpath="Invalid_fpath")
 
 
-def test_kmer_load_TableFormatError(tmp_path):
-    kmer_fpath = MagicMock(
-        return_value="path_to_kmer_frequency_table",
-        name="path to input kmer frequency table",
-    )
-    with patch("os.path.getsize", return_value=2 * 1024 * 1024):
-        with pytest.raises(TableFormatError):
-            kmers.load(kmer_fpath)
+def test_kmer_load_TableFormatError(invalid_df_fpath):
+    with pytest.raises(TableFormatError):
+        kmers.load(invalid_df_fpath)
 
 
 @pytest.mark.parametrize("multiprocess", [True, False])
@@ -183,16 +190,9 @@ def test_embed_out_exists(norm_df, tmp_path):
     )
 
 
-@patch("os.path.getsize", return_value=2 * 1024 * 1024)
-def test_embed_TableFormatError(pacthed_file_size, tmp_path):
-    kmer_fpath = MagicMock(
-        return_value="path_to_kmer_frequency_table",
-        name="path to input kmer frequency table",
-        spec="path_to_kmers_file",
-    )
-    with patch("os.path.exists", return_value=True):
-        with pytest.raises(TableFormatError):
-            kmers.embed(kmers=kmer_fpath)
+def test_embed_TableFormatError(invalid_df_fpath):
+    with pytest.raises(TableFormatError):
+        kmers.embed(kmers=invalid_df_fpath)
 
 
 def test_embed_TypeError(tmp_path):

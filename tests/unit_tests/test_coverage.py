@@ -1,25 +1,8 @@
-"""
-COPYRIGHT
-Copyright 2020 Ian J. Miller, Evan R. Rees, Kyle Wolf, Siddharth Uppal,
-Shaurya Chanana, Izaak Miller, Jason C. Kwan
-This file is part of Autometa.
-Autometa is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-Autometa is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
-You should have received a copy of the GNU Affero General Public License
-along with Autometa. If not, see <http://www.gnu.org/licenses/>.
-COPYRIGHT
-Unit test for coverage.py
-"""
-
-
 import pytest
-import pandas
+import subprocess
+
+import pandas as pd
+
 
 from autometa.common import coverage
 
@@ -41,6 +24,61 @@ def fixture_metagenome(variables, tmp_path):
     return fpath.as_posix()
 
 
+@pytest.fixture(name="sam_alignment")
+def fixture_alignment_sam(variables, tmp_path):
+    coverage_test_data = variables["coverage"]
+    alignment_records = coverage_test_data["sam"]
+    outlines = ""
+    for unique_id, values in alignment_records.items():
+        values = "\t".join(values)
+        outlines += f"{unique_id}\t{values}\n"
+    fpath = tmp_path / "records.sam"
+    with open(fpath, "w") as fh:
+        fh.write(outlines)
+    return fpath.as_posix()
+
+
+@pytest.fixture(name="bam_alignment")
+def fixture_alignment_bam(variables, sam_alignment, tmp_path):
+    bam_fpath = tmp_path / "records.bam"
+    cmd = f"samtools view -bS {sam_alignment} > {bam_fpath}"
+    subprocess.run(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        shell=True,
+        check=True,
+    )
+    return bam_fpath.as_posix()
+
+
+@pytest.fixture(name="bed_alignment")
+def fixture_alignment_bed(variables, tmp_path):
+    coverage_test_data = variables["coverage"]
+    alignment_records = coverage_test_data["bed"]
+    outlines = ""
+    for unique_id, values in alignment_records.items():
+        unique_id = unique_id.rsplit("_", 1)[0]
+        values = "\t".join(values)
+        outlines += f"{unique_id}\t{values}\n"
+    fpath = tmp_path / "records.bed"
+    with open(fpath, "w") as fh:
+        fh.write(outlines)
+    return fpath.as_posix()
+
+
+@pytest.fixture(name="df_exists_fpath")
+def fixture_df_without_contig_index_(tmp_path):
+    df_dict = {
+        "contig": ["contig_1", "contig_2", "contig_3"],
+        "coverage": [1, 2, 3],
+    }
+    df = pd.DataFrame(df_dict)
+    df_fpath = tmp_path / "invalid_df.tsv"
+    df.to_csv(df_fpath, sep="\t")
+    return df_fpath.as_posix()
+
+
 # TODO: Create fixtures for each set of data.
 # Then group fixtures into a group and indirectly parametrize group
 # i.e. alignments.sam, alignments.bam, alignments.bed, fwd_reads.fq, rev_reads.fq
@@ -55,21 +93,41 @@ def test_coverage_get_from_spades(small_metagenome, tmp_path):
     assert out.exists()
 
 
-@pytest.mark.skip
-@pytest.mark.wip
-def test_coverage_get_from_sam(small_metagenome, tmp_path):
+def test_coverage_get_from_bed(small_metagenome, bed_alignment, tmp_path):
+    out = tmp_path / "covs_from_bed.tsv"
+    df = coverage.get(
+        fasta=small_metagenome, from_spades=False, out=out, bed=bed_alignment
+    )
+    assert df.index.name == "contig"
+    assert "coverage" in df.columns
+    assert out.exists()
+
+
+def test_coverage_get_from_sam(small_metagenome, sam_alignment, tmp_path):
     out = tmp_path / "covs_from_sam.tsv"
-    df = coverage.get(fasta=small_metagenome, from_spades=False, out=out)
+    df = coverage.get(
+        fasta=small_metagenome, from_spades=False, out=out, sam=sam_alignment
+    )
     assert df.index.name == "contig"
     assert "coverage" in df.columns
     assert out.exists()
 
 
-@pytest.mark.skip
-@pytest.mark.wip
-def test_coverage_get_from_bam(small_metagenome, tmp_path):
+def test_coverage_get_from_bam(small_metagenome, bam_alignment, tmp_path):
     out = tmp_path / "covs_from_bam.tsv"
-    df = coverage.get(fasta=small_metagenome, from_spades=False, out=out)
+    df = coverage.get(
+        fasta=small_metagenome, from_spades=False, out=out, bam=bam_alignment
+    )
     assert df.index.name == "contig"
     assert "coverage" in df.columns
     assert out.exists()
+
+
+def test_get_ValueError(small_metagenome, tmp_path):
+    out = tmp_path / "covs.tsv"
+    with pytest.raises(ValueError):
+        coverage.get(fasta=small_metagenome, from_spades=False, out=out)
+
+
+def test_embed_df_already_exists(small_metagenome, df_exists_fpath, bed_alignment):
+    coverage.get(fasta=small_metagenome, out=df_exists_fpath, bed=bed_alignment)

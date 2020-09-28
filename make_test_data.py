@@ -45,7 +45,7 @@ class TestData:
     blastp_orfs_fpath = attr.ib(validator=attr.validators.instance_of(str))
     data = attr.ib(factory=dict)
     sam_fpath = attr.ib(validator=attr.validators.instance_of(str))
-    bam_fpath = attr.ib(validator=attr.validators.instance_of(str))
+    # bam_fpath = attr.ib(validator=attr.validators.instance_of(str))
     bed_fpath = attr.ib(validator=attr.validators.instance_of(str))
 
     def get_kmers(self):
@@ -128,35 +128,40 @@ class TestData:
             "blastp": blastp.to_json(),
         }
 
+    def get_alignment_records(self, fpath):
+        alignment_records = {}
+        unique_id = 0
+        with open(fpath) as fh:
+            for line in fh:
+                line = line.strip().split("\t")
+                unique_line = line[0]
+                # In case of bed files
+                if unique_line in alignment_records:
+                    unique_line = line[0] + "_" + str(unique_id)
+                    unique_id += 1
+                alignment_records[unique_line] = line[1:]
+        return alignment_records
+
     def get_coverage(self):
-        out_bam_fpath = "records_bam.txt"
-        cmd = f"samtools view {self.bam_fpath} > {out_bam_fpath}"
-        subprocess.run(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            shell=True,
-            check=True,
-        )
+        # out_bam_fpath = "records_bam.txt"
+        # cmd = f"samtools view {self.bam_fpath} > {out_bam_fpath}"
+        # subprocess.run(
+        #     cmd,
+        #     stdout=subprocess.DEVNULL,
+        #     stderr=subprocess.DEVNULL,
+        #     shell=True,
+        #     check=True,
+        # )
 
-        def get_alignment_records(fpath):
-            alignment_records = {}
-            with open(fpath) as fh:
-                for line in fh:
-                    line = line.strip()
-                    line = line.split("\t")
-                    alignment_records[line[0]] = line[1:]
-            return alignment_records
-
-        print("Making alignment records ...")
+        print("Making alignment records (sam, bam and bed files) ...")
 
         self.data["coverage"] = {
             "spades_records": self.records_fpath,
-            "bed": get_alignment_records(self.bed_fpath),
-            "bam": get_alignment_records(out_bam_fpath),
-            "sam": get_alignment_records(self.sam_fpath),
+            "bed": self.get_alignment_records(self.bed_fpath),
+            # "bam": self.get_alignment_records(out_bam_fpath),
+            "sam": self.get_alignment_records(self.sam_fpath),
         }
-        os.remove(out_bam_fpath)
+        # os.remove(out_bam_fpath)
 
     def to_json(self, out: str):
         print(f"Serializing data to {out}")
@@ -181,7 +186,7 @@ def main():
     blastp_orfs_fpath = "tests/data/metagenome.filtered.orfs.faa"
     # blastp_orfs_fpath = outdir / "metagenome.filtered.orfs.faa"
     sam_fpath = "tests/data/records.sam"
-    bam_fpath = "tests/data/records.bam"
+    # bam_fpath = "tests/data/records.bam"
     bed_fpath = "tests/data/records.bed"
 
     test_data = TestData(
@@ -192,7 +197,7 @@ def main():
         blastp_fpath=blastp_fpath,
         blastp_orfs_fpath=blastp_orfs_fpath,
         sam_fpath=sam_fpath,
-        bam_fpath=bam_fpath,
+        # bam_fpath=bam_fpath,
         bed_fpath=bed_fpath,
     )
 
