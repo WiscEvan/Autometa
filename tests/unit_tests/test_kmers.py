@@ -7,17 +7,15 @@ from autometa.common import kmers
 from unittest.mock import patch, MagicMock
 from autometa.common.exceptions import TableFormatError
 
-# TODO: from autometa.datasets import download_test_data()
 
-
-@pytest.fixture(name="small_metagenome")
-def fixture_metagenome(variables, tmp_path):
-    kmer_test_data = variables["kmers"]
-    records = kmer_test_data["small_metagenome"]
+@pytest.fixture(name="assembly")
+def fixture_assembly(variables, tmp_path):
+    kmer_test_data = variables["metagenome"]
+    records = kmer_test_data["assembly"]
     outlines = ""
     for record, seq in records.items():
         outlines += f"{record}\n{seq}\n"
-    fpath = tmp_path / "small_metagenome.fna"
+    fpath = tmp_path / "metagenome.fna"
     with open(fpath, "w") as fh:
         fh.write(outlines)
     return fpath.as_posix()
@@ -27,6 +25,7 @@ def fixture_metagenome(variables, tmp_path):
 def fixture_counts(variables):
     kmer_test_data = variables["kmers"]
     df = pd.read_json(kmer_test_data["counts"])
+    # kmer size is 5 (b/c this is the default).
     df.set_index("contig", inplace=True)
     return df
 
@@ -41,7 +40,7 @@ def fixture_counts_fpath(counts, tmp_path):
 @pytest.fixture(name="norm_df")
 def fixture_norm_df(variables):
     kmer_test_data = variables["kmers"]
-    df = pd.read_json(kmer_test_data["norm_df"])
+    df = pd.read_json(kmer_test_data["am_clr_normalized_counts"])
     df.set_index("contig", inplace=True)
     return df
 
@@ -75,16 +74,12 @@ def test_kmer_load_TableFormatError(invalid_df_fpath):
 
 
 @pytest.mark.parametrize("multiprocess", [True, False])
-def test_count(small_metagenome, multiprocess, tmp_path):
+def test_count(assembly, multiprocess, tmp_path):
     out = tmp_path / "kmers.tsv"
     size = 5
     force = False
     df = kmers.count(
-        assembly=small_metagenome,
-        size=size,
-        out=out,
-        force=force,
-        multiprocess=multiprocess,
+        assembly=assembly, size=size, out=out, force=force, multiprocess=multiprocess,
     )
     assert df.shape[1] == 4 ** size / 2
     assert df.index.name == "contig"
@@ -92,22 +87,23 @@ def test_count(small_metagenome, multiprocess, tmp_path):
 
 
 @pytest.mark.parametrize("force", [True, False])
-def test_count_out_exists(small_metagenome, counts, force, tmp_path):
+def test_count_out_exists(assembly, counts, force, tmp_path):
     out = tmp_path / "kmers.tsv"
     counts.to_csv(out, sep="\t", index=True, header=True)
     size = 5
     df = kmers.count(
-        assembly=small_metagenome, size=size, out=out, force=force, multiprocess=True,
+        assembly=assembly, size=size, out=out, force=force, multiprocess=True,
     )
     assert df.shape[1] == 4 ** size / 2
     assert df.index.name == "contig"
     assert out.exists()
 
 
-def test_count_wrong_size(small_metagenome):
+def test_count_wrong_size(assembly, tmp_path):
+    out = tmp_path / "kmers.tsv"
     size = 5.5
     with pytest.raises(TypeError):
-        kmers.count(assembly=small_metagenome, size=size)
+        df = kmers.count(assembly=assembly, size=size)
 
 
 @pytest.mark.parametrize("method", ["am_clr", "clr", "ilr"])
@@ -138,6 +134,7 @@ def test_normalize_wrong_method(counts, tmp_path):
         kmers.normalize(df=counts, method="am_ilr", out=out, force=False)
 
 
+@pytest.mark.wip
 @pytest.mark.parametrize("method", ["bhsne", "sksne", "umap"])
 def test_embed(norm_df, method, tmp_path):
     seed = 42
@@ -145,7 +142,7 @@ def test_embed(norm_df, method, tmp_path):
     force = False
     embed_dimensions = 2
     do_pca = True
-    pca_dimensions = 50
+    pca_dimensions = 3
     df = kmers.embed(
         kmers=norm_df,
         out=out,
@@ -166,7 +163,7 @@ def test_embed_out_exists(norm_df, tmp_path):
     method = "bhsne"
     embed_dimensions = 2
     do_pca = True
-    pca_dimensions = 50
+    pca_dimensions = 3
     df = kmers.embed(
         kmers=norm_df,
         out=out,
