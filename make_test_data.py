@@ -5,8 +5,8 @@ import gzip
 import json
 import subprocess
 import os
-
 import attr
+
 import pandas as pd
 from Bio import SeqIO
 
@@ -55,6 +55,10 @@ class TestData:
     blastp_query_orfs_fpath = attr.ib(validator=attr.validators.instance_of(str))
     data = attr.ib(factory=dict)
     seed = attr.ib(default=42)
+    sam_fpath = attr.ib(validator=attr.validators.instance_of(str))
+    bed_fpath = attr.ib(validator=attr.validators.instance_of(str))
+    fwd_reads = attr.ib(validator=attr.validators.instance_of(str))
+    rev_read = attr.ib(validator=attr.validators.instance_of(str))
 
     def get_kmers(self, num_records=4):
         if num_records < 4:
@@ -127,11 +131,14 @@ class TestData:
     def get_taxonomy(self, num_orfs=2):
         logging.info("Making taxonomy test data...")
         # Get diamond blastp output table
-        blastp = pd.read_csv(self.blastp_fpath, sep="\t", header=None)
         orf_column = 0
+        blastp = pd.read_csv(
+            self.blastp_fpath, sep="\t", index_col=orf_column, header=None
+        )
         # Get number of unique ORFs set by `num_orfs`, default is 2.
-        orf_hits = set(blastp[orf_column].unique().tolist()[:num_orfs])
-        blastp = blastp.set_index(orf_column).loc[orf_hits].reset_index()
+        orf_hits = set(blastp.index.unique().tolist()[:num_orfs])
+        blastp = blastp.loc[orf_hits]
+        blastp.reset_index(inplace=True)
         if num_orfs == 2:
             # NODE_38_length_280079_cov_224.186_1 and NODE_38_length_280079_cov_224.186_2
             # together have 400 hits
@@ -173,40 +180,64 @@ class TestData:
             "names": names,
         }
 
-    def get_alignment_records(self, fpath):
-        alignment_records = {}
-        unique_id = 0
-        with open(fpath) as fh:
+    def get_bed_alignments(self, num_contigs=1):
+        contig_col = 0
+        coverages = pd.read_csv(
+            self.bed_fpath, sep="\t", index_col=contig_col, header=None
+        )
+        # Get number of unique contigs set by `num_contigs`, default is 1.
+        contigs = set(coverages.index.unique().tolist()[:num_contigs])
+        coverages = coverages.loc[contigs]
+        coverages.reset_index(
+            inplace=True
+        )  # Here we are ready to send to json object self.data
+        return coverages
+
+    def get_sam_alignments(self, num_contigs=1):
+        with open(self.sam_fpath) as fh:
+            lines = ""
+            contig = None
             for line in fh:
-                line = line.strip().split("\t")
-                unique_line = line[0]
-                # In case of bed files
-                if unique_line in alignment_records:
-                    unique_line = line[0] + "_" + str(unique_id)
-                    unique_id += 1
-                alignment_records[unique_line] = line[1:]
-        return alignment_records
+                if line.startswith("@SQ"):
+                    # example line
+                    # @SQ	SN:NODE_1503_length_7231_cov_222.076	LN:7231
+                    contig = line.split("\t")[1]
+                    contig = contig.replace("SN:", "")
+                if line.startswith("@HD") or line.startswith("@PG") or contig in line:
+                    # @HD and @PG is required for bam construction
+                    lines += line
+        return lines
+
+    def get_reads(self):
+        reads = []
+        for file in [self.fwd_reads, self.rev_read]:
+            outlines = ""
+            count = 0
+            with open(file) as fh:
+                for line in fh:
+                    if "+" in line:
+                        count += 1
+                    if count >= 5:
+                        break
+                    outlines += line
+            reads.append(outlines)
+        return reads
 
     def get_coverage(self):
-        # out_bam_fpath = "records_bam.txt"
-        # cmd = f"samtools view {self.bam_fpath} > {out_bam_fpath}"
-        # subprocess.run(
-        #     cmd,
-        #     stdout=subprocess.DEVNULL,
-        #     stderr=subprocess.DEVNULL,
-        #     shell=True,
-        #     check=True,
-        # )
-
-        print("Making alignment records (sam, bam and bed files) ...")
-
+        logging.info("Making alignment records (sam, and bed files) ...")
+        bed = self.get_bed_alignments()
+        sam = self.get_sam_alignments()
+        logging.info("Getting fwd and rev reads ...")
+        reads = self.get_reads()
+        fwd_reads = reads[0]
+        rev_reads = reads[1]
         self.data["coverage"] = {
             "spades_records": self.records_fpath,
-            "bed": self.get_alignment_records(self.bed_fpath),
-            # "bam": self.get_alignment_records(out_bam_fpath),
-            "sam": self.get_alignment_records(self.sam_fpath),
+            "bed": bed.to_json(),
+            "sam": sam,
+            "fwd_reads": fwd_reads,
+            "rev_reads": rev_reads,
         }
-        # os.remove(out_bam_fpath)
 
     def to_json(self, out: str):
         logging.info(f"Serializing data to {out}")
@@ -227,6 +258,10 @@ def main():
     ncbi_dirpath = os.path.join("autometa", "databases", "ncbi")
     blastp_fpath = os.path.join(outdir, "metagenome.filtered.orfs.dmnd.blastp")
     blastp_query_orfs_fpath = os.path.join(outdir, "metagenome.filtered.orfs.faa")
+    sam_fpath = os.path.join(outdir, "records.sam")
+    bed_fpath = os.path.join(outdir, "records.bed")
+    fwd_reads = os.path.join(outdir, "records_1.fastq")
+    rev_read = os.path.join(outdir, "records_2.fastq")
 
     test_data = TestData(
         records_fpath=records_fpath,
@@ -238,6 +273,10 @@ def main():
         ncbi_dirpath=ncbi_dirpath,
         blastp_fpath=blastp_fpath,
         blastp_query_orfs_fpath=blastp_query_orfs_fpath,
+        sam_fpath=sam_fpath,
+        bed_fpath=bed_fpath,
+        fwd_reads=fwd_reads,
+        rev_read=rev_read,
     )
 
     # TODO: Decrease the size of the test_data.json file...
@@ -245,7 +284,7 @@ def main():
     # COMBAK: Minimize data structures for coverage test data
     test_data.get_coverage()
     # # COMBAK: Minimize data structures for taxonomy test data
-    test_data.get_taxonomy()
+    # test_data.get_taxonomy()
     test_data.get_markers()
 
     out = os.path.join(outdir, "test_data.json")

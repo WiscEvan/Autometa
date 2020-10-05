@@ -219,7 +219,7 @@ def get(
         # Now we need to determine which point to start the calculation...
         for fp, argname in zip([bed, bam, sam], ["bed", "bam", "sam"]):
             step = "full"
-            if os.path.exists(fp) and os.path.getsize(out):
+            if os.path.exists(fp):
                 step = f"{argname}_exists"
                 break
 
