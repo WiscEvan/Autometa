@@ -201,12 +201,4 @@ def fixture_mock_parser(
 
 
 def test_coverage_main(monkeypatch, mock_parser):
-    with monkeypatch.context() as m:
-
-        def return_args(*args, **kwargs):
-            assert not args
-            assert kwargs["lengths"] == "lengths.tsv"
-            assert kwargs["cpus"] == 2
-
-        m.setattr(coverage, "get", return_args, raising=True)
-        coverage.main()
+    coverage.main()

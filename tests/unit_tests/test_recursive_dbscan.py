@@ -4,6 +4,7 @@ import argparse
 import pandas as pd
 
 from autometa.binning import recursive_dbscan
+from autometa.common.exceptions import TableFormatError
 from autometa.common.markers import load as load_markers
 
 
@@ -13,7 +14,7 @@ def fixture_kmers(variables, tmp_path):
     df = pd.read_json(binning_test_data["kmers_normalized"])
     fpath = tmp_path / "kmers.norm.tsv"
     df.to_csv(fpath, sep="\t", index=False, header=True)
-    return fpath
+    return fpath.as_posix()
 
 
 @pytest.fixture(name="embedded_kmers")
@@ -67,6 +68,16 @@ def fixture_master(embedded_kmers, coverage, taxonomy):
     return master
 
 
+@pytest.fixture(name="df_without_markers")
+def fixture_empty_df():
+    invalid_dict = {
+        "contig": ["invalid_contig_1", "invalid_contig_2", "invalid_contig_3"],
+        "markers": ["invalid_marker1", "invalid_marker2", "invalid_marker3"],
+    }
+    df = pd.DataFrame(invalid_dict)
+    return df
+
+
 @pytest.mark.parametrize("usetaxonomy", [True, False])
 @pytest.mark.parametrize("method", ["dbscan", "hdbscan"])
 def test_binning(master, markers, usetaxonomy, method):
@@ -91,7 +102,7 @@ def test_binning(master, markers, usetaxonomy, method):
 
 def test_binning_invalid_clustering_method(master, markers):
     with pytest.raises(ValueError):
-        df = recursive_dbscan.binning(
+        recursive_dbscan.binning(
             master=master,
             markers=markers,
             taxonomy=False,
@@ -102,6 +113,20 @@ def test_binning_invalid_clustering_method(master, markers):
             purity=90.0,
             method="invalid_clustering_method",
             verbose=False,
+        )
+
+
+@pytest.mark.wip
+def test_binning_empty_markers_table(
+    df_without_markers, master,
+):
+    with pytest.raises(TableFormatError):
+        recursive_dbscan.binning(
+            master=master,
+            markers=df_without_markers,
+            domain="bacteria",
+            method="hdbscan",
+            taxonomy=False,
         )
 
 

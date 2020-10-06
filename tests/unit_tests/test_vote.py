@@ -180,6 +180,7 @@ def test_add_ranks(ncbi_dir, votes, tmp_path):
         assert canonical_rank in df.columns
 
 
+@pytest.mark.skip
 @pytest.mark.slow
 def test_vote_assign(blastp, ncbi_dir, prot_orfs, tmp_path):
     out = tmp_path / "votes.tsv"

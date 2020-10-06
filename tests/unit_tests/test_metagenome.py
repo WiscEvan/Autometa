@@ -1,5 +1,6 @@
 import pytest
 import os
+import argparse
 
 from autometa.common.metagenome import Metagenome
 from autometa.common.external import prodigal
@@ -170,21 +171,34 @@ def test_orfs_called(metagenome, monkeypatch):
         assert called
 
 
-# @pytest.mark.skip
-# @pytest.mark.wip
-# @pytest.mark.entrypoint
-# def test_metagenome_main(monkeypatch):
-#     class MockNamespace:
-#         def __init__(self):
-#             self.force = False
-#             self.assembly = "path/to/assembly.fna"
-#             self.cutoff = 3000
-#             self.out = "path/to/assembly.filtered.fna"
+@pytest.fixture(name="mock_parser")
+def fixture_mock_parser(
+    assembly, monkeypatch, tmp_path,
+):
+    def return_mock_parser(*args, **kwargs):
+        return MockParser()
 
-#     def return_mock_namespace():
-#         # These args will need to correspond to whatever main() function for module.
-#         # see setup.py console_scripts list for functions
-#         # construct args... and return
-#         return MockNamespace()
-#     monkeypatch.setattr(parser, "parse_args", return_mock_namespace)
-#     pass
+    class MockParseArgs:
+        def __init__(self, assembly, out):
+            self.assembly = assembly
+            self.force = True
+            self.cutoff = 3000
+            self.out = out
+            self.stats = True
+
+    class MockParser:
+        def add_argument(self, *args, **kwargs):
+            pass
+
+        def parse_args(self):
+            out = tmp_path / "binning.tsv"
+            return MockParseArgs(assembly, out)
+
+    # Defining the MockParser class to represent parser
+    monkeypatch.setattr(argparse, "ArgumentParser", return_mock_parser, raising=True)
+
+
+def test_coverage_main(monkeypatch, mock_parser):
+    from autometa.common import metagenome
+
+    metagenome.main()

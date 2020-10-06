@@ -198,7 +198,7 @@ class TestData:
         # Get diamond blastp output table
         orf_column = 0
         blastp = pd.read_csv(
-            self.blastp_fpath, sep="\t", index_col=orf_column, header=None
+            self.taxonmy_blastp, sep="\t", index_col=orf_column, header=None
         )
         # Get number of unique ORFs set by `num_orfs`, default is 2.
         orf_hits = set(blastp.index.unique().tolist()[:num_orfs])
@@ -392,7 +392,7 @@ def main():
     # COMBAK: Minimize data structures for coverage test data
     test_data.get_coverage()
     # # COMBAK: Minimize data structures for taxonomy test data
-    # test_data.get_taxonomy()
+    test_data.get_taxonomy()
     test_data.get_markers()
     test_data.get_binning()
 

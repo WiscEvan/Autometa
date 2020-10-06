@@ -467,11 +467,7 @@ def main():
     args = parser.parse_args()
     dirpath = os.path.dirname(os.path.realpath(args.assembly))
     raw_mg = Metagenome(
-        assembly=args.assembly,
-        outdir=dirpath,
-        prot_orfs_fpath="",
-        nucl_orfs_fpath="",
-        force=args.force,
+        assembly=args.assembly, outdir=dirpath, prot_orfs_fpath="", nucl_orfs_fpath="",
     )
 
     filtered_mg = raw_mg.length_filter(

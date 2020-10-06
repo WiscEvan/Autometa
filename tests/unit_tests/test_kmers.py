@@ -1,5 +1,7 @@
 import pytest
 import os
+import argparse
+
 import pandas as pd
 from Bio import SeqIO
 
@@ -100,10 +102,9 @@ def test_count_out_exists(assembly, counts, force, tmp_path):
 
 
 def test_count_wrong_size(assembly, tmp_path):
-    out = tmp_path / "kmers.tsv"
     size = 5.5
     with pytest.raises(TypeError):
-        df = kmers.count(assembly=assembly, size=size)
+        kmers.count(assembly=assembly, size=size)
 
 
 @pytest.mark.parametrize("method", ["am_clr", "clr", "ilr"])
@@ -203,3 +204,45 @@ def test_embed_FileNotFoundError(pacthed_file_size, tmp_path):
     out = tmp_path / "kmers.embed.tsv"
     with pytest.raises(FileNotFoundError):
         kmers.embed(kmers=empty_df, out=out, force=True)
+
+
+@pytest.fixture(name="mock_parser")
+def fixture_mock_parser(
+    assembly, counts, norm_df, monkeypatch, tmp_path,
+):
+    def return_mock_parser(*args, **kwargs):
+        return MockParser()
+
+    class MockParseArgs:
+        def __init__(self, assembly, counts, out, norm_df):
+            self.fasta = assembly
+            self.size = 5
+            self.kmers = out
+            self.force = True
+            self.multiprocess = True
+            self.cpus = 2
+            self.normalized = True
+            self.norm_method = "am_clr"
+            self.normalized = out
+            self.embedded = True
+            self.embedded = out
+            self.embed_method = "bhsne"
+            self.embed_dimensions = 2
+            self.do_pca = True
+            self.pca_dimensions = 2
+            self.seed = 42
+
+    class MockParser:
+        def add_argument(self, *args, **kwargs):
+            pass
+
+        def parse_args(self):
+            out = tmp_path / "binning.tsv"
+            return MockParseArgs(assembly, counts, out, norm_df,)
+
+    # Defining the MockParser class to represent parser
+    monkeypatch.setattr(argparse, "ArgumentParser", return_mock_parser, raising=True)
+
+
+def test_coverage_main(monkeypatch, mock_parser):
+    kmers.main()
