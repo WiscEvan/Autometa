@@ -273,7 +273,7 @@ class TestData:
                     lines += line
         return lines
 
-    def get_reads(self):
+    def get_reads(self, read_count=5):
         reads = []
         for file in [self.fwd_reads, self.rev_read]:
             outlines = ""
@@ -282,7 +282,7 @@ class TestData:
                 for line in fh:
                     if "+" in line:
                         count += 1
-                    if count >= 5:
+                    if count >= read_count:
                         break
                     outlines += line
             reads.append(outlines)
@@ -297,12 +297,23 @@ class TestData:
         fwd_reads = reads[0]
         rev_reads = reads[1]
         self.data["coverage"] = {
-            "spades_records": self.records_fpath,
+            "spades_records": self.metagenome,
             "bed": bed.to_json(),
             "sam": sam,
             "fwd_reads": fwd_reads,
             "rev_reads": rev_reads,
         }
+
+    def get_binning(self, num_contigs: int = 10):
+        # Need kmers, coverage, markers, taxonomy
+        logger.info("Preparing binning test data")
+        annotations = {
+            "kmers_normalized": self.binning_norm_kmers,
+            "kmers_embedded": self.binning_embedded_kmers,
+            "taxonomy": self.binning_taxonomy,
+            "coverage": self.binning_coverage,
+        }
+
         markers_df = pd.read_csv(self.binning_markers, sep="\t", index_col="contig")
         contigs = None
         for annotation, fpath in annotations.items():
@@ -332,30 +343,44 @@ class TestData:
 def main():
 
     outdir = os.path.join("tests", "data")
-    records_fpath = os.path.join(outdir, "records.fna")
-    nucls_out = os.path.join(outdir, "orfs.fna")
-    prots_out = os.path.join(outdir, "orfs.faa")
-    markers_query_orfs_fpath = os.path.join(outdir, "markers_query_orfs.faa")
-    scans_fpath = os.path.join(outdir, "archaea.hmmscan.tsv")
-    markers_fpath = os.path.join(outdir, "archaea.markers.tsv")
-    ncbi_dirpath = os.path.join("autometa", "databases", "ncbi")
-    blastp_fpath = os.path.join(outdir, "metagenome.filtered.orfs.dmnd.blastp")
-    blastp_query_orfs_fpath = os.path.join(outdir, "metagenome.filtered.orfs.faa")
+    metagenome = os.path.join(outdir, "records.fna")
+    metagenome_nucl_orfs = os.path.join(outdir, "metagenome_nucl_orfs.fasta")
+    metagenome_prot_orfs = os.path.join(outdir, "metagenome_prot_orfs.fasta")
+    # coverage_reads = os.path.join(outdir, "coverage_reads.fastq")
+    # coverage_sam = os.path.join(outdir, "coverage.sam")
+    # coverage_bam = os.path.join(outdir, "coverage.bam")
+    # coverage_bed = os.path.join(outdir, "coverage.bed")
+    markers_orfs = os.path.join(outdir, "markers_orfs.faa")
+    markers_scans = os.path.join(outdir, "markers_scans.tsv.gz")
+    markers_filtered = os.path.join(outdir, "markers_filtered.tsv.gz")
+    taxonomy_ncbi = os.path.join("autometa", "databases", "ncbi")
+    taxonmy_blastp = os.path.join(outdir, "blastp.tsv.gz")
+    taxonomy_orfs = os.path.join(outdir, "taxonomy_orfs.faa")
+    binning_norm_kmers = os.path.join(outdir, "binning_kmers.am_clr.tsv.gz")
+    binning_embedded_kmers = os.path.join(outdir, "binning_kmers.am_clr.bhsne.tsv.gz")
+    binning_coverage = os.path.join(outdir, "binning_coverage.tsv.gz")
+    binning_markers = os.path.join(outdir, "binning_markers.tsv.gz")
+    binning_taxonomy = os.path.join(outdir, "binning_taxonomy.tsv.gz")
     sam_fpath = os.path.join(outdir, "records.sam")
     bed_fpath = os.path.join(outdir, "records.bed")
     fwd_reads = os.path.join(outdir, "records_1.fastq")
     rev_read = os.path.join(outdir, "records_2.fastq")
 
     test_data = TestData(
-        records_fpath=records_fpath,
-        nucls_out=nucls_out,
-        prots_out=prots_out,
-        markers_query_orfs_fpath=markers_query_orfs_fpath,
-        scans_fpath=scans_fpath,
-        markers_fpath=markers_fpath,
-        ncbi_dirpath=ncbi_dirpath,
-        blastp_fpath=blastp_fpath,
-        blastp_query_orfs_fpath=blastp_query_orfs_fpath,
+        metagenome=metagenome,
+        metagenome_nucl_orfs=metagenome_nucl_orfs,
+        metagenome_prot_orfs=metagenome_prot_orfs,
+        markers_orfs=markers_orfs,
+        markers_scans=markers_scans,
+        markers_filtered=markers_filtered,
+        taxonomy_ncbi=taxonomy_ncbi,
+        taxonmy_blastp=taxonmy_blastp,
+        taxonomy_orfs=taxonomy_orfs,
+        binning_norm_kmers=binning_norm_kmers,
+        binning_embedded_kmers=binning_embedded_kmers,
+        binning_coverage=binning_coverage,
+        binning_markers=binning_markers,
+        binning_taxonomy=binning_taxonomy,
         sam_fpath=sam_fpath,
         bed_fpath=bed_fpath,
         fwd_reads=fwd_reads,

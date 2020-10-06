@@ -1,9 +1,10 @@
 import pytest
+import argparse
+
 import pandas as pd
 
 from autometa.binning import recursive_dbscan
 from autometa.common.markers import load as load_markers
-import argparse
 
 
 @pytest.fixture(name="kmers")
