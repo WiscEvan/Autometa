@@ -1,6 +1,7 @@
 import pytest
 import subprocess
 import os
+import argparse
 
 import pandas as pd
 
@@ -137,3 +138,75 @@ def test_get_ValueError(metagenome, tmp_path):
 
 def test_embed_df_already_exists(metagenome, df_exists_fpath, bed_alignment):
     coverage.get(fasta=metagenome, out=df_exists_fpath, bed=bed_alignment)
+
+
+use_spades = [True, False]
+
+
+@pytest.fixture(name="mock_parser", params=use_spades)
+def fixture_mock_parser(
+    metagenome,
+    sam_alignment,
+    bam_alignment,
+    bed_alignment,
+    fwd_reads,
+    rev_reads,
+    monkeypatch,
+    tmp_path,
+    request,
+):
+    def return_mock_parser(*args, **kwargs):
+        return MockParser()
+
+    class MockParseArgs:
+        def __init__(
+            self,
+            metagenome,
+            sam_alignment,
+            bam_alignment,
+            bed_alignment,
+            fwd_reads,
+            rev_reads,
+            out,
+        ):
+            self.assembly = metagenome
+            self.fwd_reads = fwd_reads
+            self.rev_reads = rev_reads
+            self.sam = sam_alignment
+            self.bam = bam_alignment
+            self.lengths = "lengths.tsv"
+            self.bed = bed_alignment
+            self.cpus = 2
+            self.out = out
+            self.from_spades = request.param
+
+    class MockParser:
+        def add_argument(self, *args, **kwargs):
+            pass
+
+        def parse_args(self):
+            out = tmp_path / "binning.tsv"
+            return MockParseArgs(
+                metagenome,
+                sam_alignment,
+                bam_alignment,
+                bed_alignment,
+                fwd_reads,
+                rev_reads,
+                out,
+            )
+
+    # Defining the MockParser class to represent parser
+    monkeypatch.setattr(argparse, "ArgumentParser", return_mock_parser, raising=True)
+
+
+def test_coverage_main(monkeypatch, mock_parser):
+    with monkeypatch.context() as m:
+
+        def return_args(*args, **kwargs):
+            assert not args
+            assert kwargs["lengths"] == "lengths.tsv"
+            assert kwargs["cpus"] == 2
+
+        m.setattr(coverage, "get", return_args, raising=True)
+        coverage.main()
