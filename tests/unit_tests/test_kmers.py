@@ -10,20 +10,21 @@ from unittest.mock import patch, MagicMock
 from autometa.common.exceptions import TableFormatError
 
 
-@pytest.fixture(name="assembly")
-def fixture_assembly(variables, tmp_path):
+@pytest.fixture(name="assembly", scope="module")
+def fixture_assembly(variables, tmp_path_factory):
     kmer_test_data = variables["metagenome"]
     records = kmer_test_data["assembly"]
     outlines = ""
     for record, seq in records.items():
         outlines += f"{record}\n{seq}\n"
-    fpath = tmp_path / "metagenome.fna"
+    outdir = tmp_path_factory.mktemp("kmers")
+    fpath = outdir / "metagenome.fna"
     with open(fpath, "w") as fh:
         fh.write(outlines)
     return fpath.as_posix()
 
 
-@pytest.fixture(name="counts")
+@pytest.fixture(name="counts", scope="module")
 def fixture_counts(variables):
     kmer_test_data = variables["kmers"]
     df = pd.read_json(kmer_test_data["counts"])
@@ -32,14 +33,14 @@ def fixture_counts(variables):
     return df
 
 
-@pytest.fixture(name="counts_fpath")
-def fixture_counts_fpath(counts, tmp_path):
-    fpath = tmp_path / "counts.tsv"
+@pytest.fixture(name="counts_fpath", scope="module")
+def fixture_counts_fpath(counts, tmp_path_factory):
+    fpath = tmp_path_factory.mktemp("kmers") / "counts.tsv"
     counts.to_csv(fpath, sep="\t", index=True, header=True)
     return fpath.as_posix()
 
 
-@pytest.fixture(name="norm_df")
+@pytest.fixture(name="norm_df", scope="module")
 def fixture_norm_df(variables):
     kmer_test_data = variables["kmers"]
     df = pd.read_json(kmer_test_data["am_clr_normalized_counts"])
