@@ -10,8 +10,9 @@ before_install:
   - bash miniconda.sh -b -p $HOME/miniconda
   # -b—Batch mode with no PATH modifications to ~/.bashrc. Assumes that you agree to the license agreement. Does not edit the .bashrc or .bash_profile files.
   # -p—Installation prefix/path.
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - source "$HOME/miniconda/etc/profile.d/conda.sh"
+  - ./miniconda.sh -b
+  - export PATH=/home/travis/miniconda2/bin:$PATH
+  # - source "$HOME/miniconda/etc/profile.d/conda.sh"
   # Purpose of hash. See https://www.javatpoint.com/bash-hash-command
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
