@@ -50,4 +50,4 @@ install:
 script:
   - make test
 after_success:
-    - codecov
+    - codecov # submit coverage report to codecov.io
