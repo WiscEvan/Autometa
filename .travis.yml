@@ -6,18 +6,22 @@ python:
 before_install:
   # Install the latest version of Miniconda
   # -O writes the file to minoconda.sh
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
-  - chmod +x miniconda.sh
-  # b—Batch mode with no PATH modifications to ~/.bashrc. Assumes that you agree to the license agreement. Does not edit the .bashrc or .bash_profile files.
-  - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda2/bin:$PATH
-  - conda update --yes conda  # Update CONDA without command line prompt
+  - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  # -b—Batch mode with no PATH modifications to ~/.bashrc. Assumes that you agree to the license agreement. Does not edit the .bashrc or .bash_profile files.
+  # -p—Installation prefix/path.
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - source "$HOME/miniconda/etc/profile.d/conda.sh"
+  # Purpose of hash. See https://www.javatpoint.com/bash-hash-command
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda  # Update CONDA without command line prompt
   # Useful for debugging any issues with conda
   - conda info -a
 
 install:
   - conda create -n autometa python=$TRAVIS_PYTHON_VERSION
-  - conda install -n autometa -c bioconda -c conda-forge --yes \
+  - conda install -n autometa -c bioconda -c conda-forge \
       biopython \
       pandas \
       tqdm \
