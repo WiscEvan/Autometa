@@ -196,7 +196,7 @@ def fixture_mock_parser(
     monkeypatch.setattr(argparse, "ArgumentParser", return_mock_parser, raising=True)
 
 
-# @pytest.mark.skip
+@pytest.mark.skip
 def test_metagenome_main(monkeypatch, mock_parser, assembly, metagenome, tmpdir):
     from autometa.common import metagenome
 
