@@ -10,7 +10,7 @@ before_install:
   - chmod +x miniconda.sh
   # b—Batch mode with no PATH modifications to ~/.bashrc. Assumes that you agree to the license agreement. Does not edit the .bashrc or .bash_profile files.
   - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda/bin:$PATH
+  - export PATH=/home/travis/miniconda2/bin:$PATH
   - conda update --yes conda  # Update CONDA without command line prompt
   # Useful for debugging any issues with conda
   - conda info -a
