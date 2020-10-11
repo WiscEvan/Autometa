@@ -7,11 +7,11 @@ before_install:
   # Install the latest version of Miniconda
   # -O writes the file to minoconda.sh
   - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-  - bash miniconda.sh -b -p $HOME/miniconda
+  # - bash miniconda.sh -b -p $HOME/miniconda
   # -b—Batch mode with no PATH modifications to ~/.bashrc. Assumes that you agree to the license agreement. Does not edit the .bashrc or .bash_profile files.
   # -p—Installation prefix/path.
   - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda2/bin:$PATH
+  - export PATH=/home/travis/miniconda3/bin:$PATH
   # - source "$HOME/miniconda/etc/profile.d/conda.sh"
   # Purpose of hash. See https://www.javatpoint.com/bash-hash-command
   - hash -r
