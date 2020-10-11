@@ -14,7 +14,7 @@ def fixture_kmers(variables, tmp_path):
     df = pd.read_json(binning_test_data["kmers_normalized"])
     fpath = tmp_path / "kmers.norm.tsv"
     df.to_csv(fpath, sep="\t", index=False, header=True)
-    return fpath.as_posix()
+    return str(fpath)
 
 
 @pytest.fixture(name="embedded_kmers")
@@ -23,7 +23,7 @@ def fixture_embedded_kmers(variables, tmp_path):
     df = pd.read_json(binning_test_data["kmers_embedded"])
     fpath = tmp_path / "kmers.embed.tsv"
     df.to_csv(fpath, sep="\t", index=False, header=True)
-    return fpath
+    return str(fpath)
 
 
 @pytest.fixture(name="coverage")
@@ -32,7 +32,7 @@ def fixture_coverage(variables, tmp_path):
     df = pd.read_json(binning_test_data["coverage"])
     fpath = tmp_path / "coverage.tsv"
     df.to_csv(fpath, sep="\t", index=False, header=True)
-    return fpath
+    return str(fpath)
 
 
 @pytest.fixture(name="taxonomy")
@@ -41,7 +41,7 @@ def fixture_taxonomy(variables, tmp_path):
     df = pd.read_json(binning_test_data["taxonomy"])
     fpath = tmp_path / "taxonomy.tsv"
     df.to_csv(fpath, sep="\t", index=False, header=True)
-    return fpath
+    return str(fpath)
 
 
 @pytest.fixture(name="markers_fpath")
@@ -50,7 +50,7 @@ def fixture_markers_fpath(variables, tmp_path):
     df = pd.read_json(binning_test_data["markers"])
     fpath = tmp_path / "markers.tsv"
     df.to_csv(fpath, sep="\t", index=False, header=True)
-    return fpath
+    return str(fpath)
 
 
 @pytest.fixture(name="markers")
@@ -66,16 +66,6 @@ def fixture_master(embedded_kmers, coverage, taxonomy):
         master = pd.merge(master, df, how="left", right_index=True, left_index=True)
     master = master.convert_dtypes()
     return master
-
-
-@pytest.fixture(name="df_without_markers")
-def fixture_empty_df():
-    invalid_dict = {
-        "contig": ["invalid_contig_1", "invalid_contig_2", "invalid_contig_3"],
-        "markers": ["invalid_marker1", "invalid_marker2", "invalid_marker3"],
-    }
-    df = pd.DataFrame(invalid_dict)
-    return df
 
 
 @pytest.mark.parametrize("usetaxonomy", [True, False])
@@ -116,14 +106,16 @@ def test_binning_invalid_clustering_method(master, markers):
         )
 
 
-@pytest.mark.wip
-def test_binning_empty_markers_table(
-    df_without_markers, master,
-):
+def test_binning_empty_markers_table(master,):
+    invalid_dict = {
+        "contig": ["invalid_contig_1", "invalid_contig_2", "invalid_contig_3"],
+        "markers": ["invalid_marker1", "invalid_marker2", "invalid_marker3"],
+    }
+    df = pd.DataFrame(invalid_dict)
     with pytest.raises(TableFormatError):
         recursive_dbscan.binning(
             master=master,
-            markers=df_without_markers,
+            markers=df,
             domain="bacteria",
             method="hdbscan",
             taxonomy=False,

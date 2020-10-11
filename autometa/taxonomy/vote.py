@@ -185,7 +185,6 @@ def assign(
     for fp, argname in zip(
         [lca_fpath, hits, blast, prot_orfs], ["lca", "orfs", "orfs", "orfs"],
     ):
-        print(fp)
         if os.path.exists(fp):
             step = f"{argname}_exists"
             break

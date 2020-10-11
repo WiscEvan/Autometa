@@ -1,6 +1,6 @@
 import pytest
-import os
 import argparse
+import os
 
 from autometa.common.metagenome import Metagenome
 from autometa.common.external import prodigal
@@ -161,14 +161,12 @@ def test_call_orfs_invalid_params(metagenome, force, parallel, cpus):
 def test_orfs_called(metagenome, monkeypatch):
     called = metagenome.orfs_called
     assert not called
-    with monkeypatch.context():
+    with monkeypatch.context() as m:
         # Here we set the filepaths to the metagenome fixture assembly path
         # (since we know this exists and is non-empty)
         # metagenome.__str__ == metagenome.assembly
-        monkeypatch.setattr(metagenome, "prot_orfs_fpath", str(metagenome))
-        monkeypatch.setattr(metagenome, "nucl_orfs_fpath", str(metagenome))
-        called = metagenome.orfs_called
-        assert called
+        m.setattr(metagenome, "prot_orfs_fpath", str(metagenome))
+        m.setattr(metagenome, "nucl_orfs_fpath", str(metagenome))
 
 
 @pytest.fixture(name="mock_parser")
@@ -186,6 +184,7 @@ def fixture_mock_parser(
             self.out = out
             self.stats = True
 
+    # Defining the MockParser class to represent parser
     class MockParser:
         def add_argument(self, *args, **kwargs):
             pass
@@ -194,11 +193,42 @@ def fixture_mock_parser(
             out = tmp_path / "binning.tsv"
             return MockParseArgs(assembly, out)
 
-    # Defining the MockParser class to represent parser
     monkeypatch.setattr(argparse, "ArgumentParser", return_mock_parser, raising=True)
 
 
-def test_coverage_main(monkeypatch, mock_parser):
+# @pytest.mark.skip
+def test_metagenome_main(monkeypatch, mock_parser, assembly, metagenome, tmpdir):
     from autometa.common import metagenome
 
-    metagenome.main()
+    # raw_mg = Metagenome(
+    #     assembly=assembly, outdir=tmpdir, prot_orfs_fpath="", nucl_orfs_fpath=""
+    # )
+    with monkeypatch.context() as m:
+
+        def return_args_Metagenome(*args, **kwargs):
+            print(f"These are the args for metagenome : {args}")
+            print(f"These are the kwargs for metagenome : {kwargs}")
+            assert not args
+            assert kwargs["assembly"] == assembly
+            assert kwargs["outdir"] == os.path.dirname(os.path.realpath(assembly))
+            assert kwargs["prot_orfs_fpath"] == ""
+            assert kwargs["nucl_orfs_fpath"] == ""
+            return Metagenome(**kwargs)
+            # return raw_mg
+
+        def return_args_length_filter(*args, **kwargs):
+            print(f"These are args: {args}")
+            print(f"These are kwargs : {kwargs}")
+            # assert not args
+            assert str(args[0]) == assembly
+            assert kwargs["cutoff"] == 3000
+            assert kwargs["force"] == True
+
+            return Metagenome.length_filter(**kwargs)
+
+        m.setattr(metagenome, "Metagenome", return_args_Metagenome, raising=True)
+        m.setattr(
+            Metagenome, "length_filter", return_args_length_filter(), raising=True,
+        )
+
+        metagenome.main()

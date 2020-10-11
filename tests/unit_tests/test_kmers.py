@@ -1,12 +1,10 @@
 import pytest
-import os
 import argparse
 
 import pandas as pd
 from Bio import SeqIO
 
 from autometa.common import kmers
-from unittest.mock import patch, MagicMock
 from autometa.common.exceptions import TableFormatError
 
 
@@ -21,7 +19,7 @@ def fixture_assembly(variables, tmp_path_factory):
     fpath = outdir / "metagenome.fna"
     with open(fpath, "w") as fh:
         fh.write(outlines)
-    return fpath.as_posix()
+    return str(fpath)
 
 
 @pytest.fixture(name="counts", scope="module")
@@ -37,7 +35,7 @@ def fixture_counts(variables):
 def fixture_counts_fpath(counts, tmp_path_factory):
     fpath = tmp_path_factory.mktemp("kmers") / "counts.tsv"
     counts.to_csv(fpath, sep="\t", index=True, header=True)
-    return fpath.as_posix()
+    return str(fpath)
 
 
 @pytest.fixture(name="norm_df", scope="module")
@@ -57,7 +55,7 @@ def fixture_df_without_contig_index_(tmp_path):
     df = pd.DataFrame(invalid_dict)
     df_fpath = tmp_path / "invalid_df.tsv"
     df.to_csv(df_fpath)
-    return df_fpath.as_posix()
+    return str(df_fpath)
 
 
 def test_kmer_load(counts_fpath):
@@ -199,8 +197,7 @@ def test_embed_TypeError(tmp_path):
         kmers.embed(kmers=kmer_fpath)
 
 
-@patch("os.path.getsize", return_value=2 * 1024 * 1024)
-def test_embed_FileNotFoundError(pacthed_file_size, tmp_path):
+def test_embed_FileNotFoundError(tmp_path):
     empty_df = pd.DataFrame({})
     out = tmp_path / "kmers.embed.tsv"
     with pytest.raises(FileNotFoundError):

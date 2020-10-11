@@ -65,9 +65,9 @@ a json file to `test_data.json` to be read by pytest-variables during testing.
 
 import gzip
 import json
-import subprocess
 import os
 import attr
+import logging
 
 import pandas as pd
 from Bio import SeqIO
@@ -75,8 +75,7 @@ from Bio import SeqIO
 from autometa.common import kmers, markers
 from autometa.common.external import hmmer, prodigal
 from autometa.taxonomy.ncbi import NCBI
-import logging
-import os
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -319,11 +318,8 @@ class TestData:
         bed = self.get_bed_alignments()
         sam = self.get_sam_alignments()
         logging.info("Getting fwd and rev reads ...")
-        reads = self.get_reads()
-        fwd_reads = reads[0]
-        rev_reads = reads[1]
+        fwd_reads, rev_reads = self.get_reads()
         self.data["coverage"] = {
-            "spades_records": self.metagenome,
             "bed": bed.to_json(),
             "sam": sam,
             "fwd_reads": fwd_reads,
@@ -433,7 +429,7 @@ def main():
     # COMBAK: Minimize data structures for coverage test data
     test_data.get_coverage()
     # # COMBAK: Minimize data structures for taxonomy test data
-    test_data.get_taxonomy()
+    # test_data.get_taxonomy()
     test_data.get_markers()
     test_data.get_binning()
     test_data.get_summary()

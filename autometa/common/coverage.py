@@ -223,7 +223,7 @@ def get(
                 step = f"{argname}_exists"
                 break
 
-        if ((not fwd_reads or not rev_reads) and not se_reads) and step == "full":
+        if (not fwd_reads or not rev_reads) and step == "full":
             raise ValueError(
                 f"fwd_reads and rev_reads are required if no other alignments are specified!"
             )
