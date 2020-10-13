@@ -6,6 +6,7 @@ from Bio import SeqIO
 
 from autometa.common import metagenome as am_metagenome
 from autometa.common.metagenome import Metagenome
+from autometa.common import metagenome
 from autometa.common.external import prodigal
 
 
