@@ -388,10 +388,6 @@ def main():
     metagenome = os.path.join(outdir, "records.fna")
     metagenome_nucl_orfs = os.path.join(outdir, "metagenome_nucl_orfs.fasta")
     metagenome_prot_orfs = os.path.join(outdir, "metagenome_prot_orfs.fasta")
-    # coverage_reads = os.path.join(outdir, "coverage_reads.fastq")
-    # coverage_sam = os.path.join(outdir, "coverage.sam")
-    # coverage_bam = os.path.join(outdir, "coverage.bam")
-    # coverage_bed = os.path.join(outdir, "coverage.bed")
     markers_orfs = os.path.join(outdir, "markers_orfs.faa")
     markers_scans = os.path.join(outdir, "markers_scans.tsv.gz")
     markers_filtered = os.path.join(outdir, "markers_filtered.tsv.gz")
@@ -439,7 +435,7 @@ def main():
     # COMBAK: Minimize data structures for coverage test data
     test_data.get_coverage()
     # # COMBAK: Minimize data structures for taxonomy test data
-    # test_data.get_taxonomy()
+    test_data.get_taxonomy()
     test_data.get_markers()
     test_data.get_binning(num_contigs=0)  # all contigs
     test_data.get_summary()
