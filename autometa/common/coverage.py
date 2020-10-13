@@ -303,25 +303,25 @@ def main():
         logger.info(f"written: {args.out}")
         return
 
+    get(
+        fasta=args.assembly,
+        fwd_reads=args.fwd_reads,
+        rev_reads=args.rev_reads,
+        sam=args.sam,
+        bam=args.bam,
+        lengths=args.lengths,
+        bed=args.bed,
+        cpus=args.cpus,
+        out=args.out,
+    )
+
+
+if __name__ == "__main__":
     try:
-        get(
-            fasta=args.assembly,
-            fwd_reads=args.fwd_reads,
-            rev_reads=args.rev_reads,
-            sam=args.sam,
-            bam=args.bam,
-            lengths=args.lengths,
-            bed=args.bed,
-            cpus=args.cpus,
-            out=args.out,
-        )
+        main()
     except Exception as err:
         logger.exception(err)
         import sys
 
-        print("Coverage calculation failed")
+        print("Coverage calculation failed. check the logs for details")
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

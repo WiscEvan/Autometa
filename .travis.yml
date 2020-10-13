@@ -48,6 +48,6 @@ install:
 
 # command to run tests
 script:
-  - make test
+  - python -m pytest
 after_success:
     - codecov # submit coverage report to codecov.io
