@@ -66,12 +66,12 @@ def test_kmer_load(counts_fpath):
     assert df.index.name == "contig"
 
 
-def test_kmer_load_FileNotFoundError():
+def test_kmer_load_missing_file():
     with pytest.raises(FileNotFoundError):
         kmers.load(kmers_fpath="Invalid_fpath")
 
 
-def test_kmer_load_TableFormatError(invalid_df_fpath):
+def test_kmer_load_table_missing_contig_column(invalid_df_fpath):
     with pytest.raises(TableFormatError):
         kmers.load(invalid_df_fpath)
 
@@ -198,13 +198,13 @@ def test_embed_TableFormatError(invalid_df_fpath):
         kmers.embed(kmers=invalid_df_fpath)
 
 
-def test_embed_TypeError(tmp_path):
+def test_embed_input_not_string_or_dataframe(tmp_path):
     kmer_fpath = tmp_path / "kmers.embed.tsv"
     with pytest.raises(TypeError):
         kmers.embed(kmers=kmer_fpath)
 
 
-def test_embed_FileNotFoundError(tmp_path):
+def test_embed_empty_dataframe(tmp_path):
     empty_df = pd.DataFrame({})
     out = tmp_path / "kmers.embed.tsv"
     with pytest.raises(FileNotFoundError):

@@ -173,31 +173,6 @@ def test_orfs_called(metagenome, monkeypatch):
         m.setattr(metagenome, "nucl_orfs_fpath", str(metagenome))
 
 
-@pytest.fixture(name="mock_parser")
-def fixture_mock_parser(
-    assembly, monkeypatch, tmp_path,
-):
-    def return_mock_parser(*args, **kwargs):
-        return MockParser()
-
-    class MockParseArgs:
-        def __init__(self, assembly, out):
-            self.assembly = assembly
-            self.force = True
-            self.cutoff = 3000
-            self.out = out
-            self.stats = True
-
-    # Defining the MockParser class to represent parser
-    class MockParser:
-        def add_argument(self, *args, **kwargs):
-            pass
-
-        def parse_args(self):
-            out = tmp_path / "binning.tsv"
-            return MockParseArgs(assembly, out)
-
-    monkeypatch.setattr(argparse, "ArgumentParser", return_mock_parser, raising=True)
 
 
 @pytest.mark.entrypoint

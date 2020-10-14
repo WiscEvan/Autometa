@@ -279,11 +279,9 @@ class TestData:
             self.bed_fpath, sep="\t", index_col=contig_col, header=None
         )
         # Get number of unique contigs set by `num_contigs`, default is 1.
-        contigs = set(coverages.index.unique().tolist()[:num_contigs])
-        coverages = coverages.loc[contigs]
-        coverages.reset_index(
-            inplace=True
-        )  # Here we are ready to send to json object self.data
+        coverages = coverages.sample(n=num_contigs, random_state=self.seed)
+        coverages.reset_index(inplace=True)
+        # Here we are ready to send to json object self.data
         return coverages
 
     def get_sam_alignments(self, num_contigs=1):
@@ -297,7 +295,7 @@ class TestData:
                     contig = line.split("\t")[1]
                     contig = contig.replace("SN:", "")
                 if line.startswith("@HD") or line.startswith("@PG") or contig in line:
-                    # @HD and @PG is required for bam construction
+                    # @HD and @PG are required for bam construction
                     lines += line
         return lines
 

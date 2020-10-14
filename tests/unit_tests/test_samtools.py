@@ -28,16 +28,11 @@ import pytest
 from autometa.common.external import samtools
 
 
-sam_fpath = "<path/to/mock/sam/file>"
-
-
-def test_samtools_sort():
-
+def test_sort_missing_file():
     with pytest.raises(FileNotFoundError):
         samtools.sort(sam="sam", bam="bam")
+
+@pytest.mark.parametrize("cpus", [2.9, -2])
+def test_sort_invalid_cpu_input(cpus):
     with pytest.raises(TypeError):
-        samtools.sort(sam="sam_fpath", bam="bam", cpus=2.9)
-    with pytest.raises(TypeError):
-        samtools.sort(
-            sam="sam_fpath", bam="bam", cpus=-2,
-        )
+        samtools.sort(sam="sam_fpath", bam="bam", cpus=cpus)

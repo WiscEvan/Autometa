@@ -128,7 +128,7 @@ def test_binning_invalid_clustering_method(master, markers):
         )
 
 
-def test_binning_empty_markers_table(master,):
+def test_binning_empty_markers_table(master):
     invalid_dict = {
         "contig": ["invalid_contig_1", "invalid_contig_2", "invalid_contig_3"],
         "markers": ["invalid_marker1", "invalid_marker2", "invalid_marker3"],

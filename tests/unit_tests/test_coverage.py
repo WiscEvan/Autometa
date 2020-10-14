@@ -39,7 +39,7 @@ def fixture_sam_alignment(variables, coverage_testdir):
 
 
 @pytest.fixture(name="bam_alignment", scope="module")
-def fixture_bam_alignment(variables, sam_alignment, coverage_testdir):
+def fixture_bam_alignment(sam_alignment, coverage_testdir):
     bam_fpath = coverage_testdir / "records.bam"
     samtools.sort(sam=sam_alignment, bam=bam_fpath)
     return str(bam_fpath)
@@ -132,7 +132,7 @@ def test_coverage_get_from_spades(metagenome, tmp_path):
     assert out.exists()
 
 
-def test_get_ValueError(metagenome, tmp_path):
+def test_get_not_enough_passed_arguments(metagenome, tmp_path):
     out = tmp_path / "covs.tsv"
     with pytest.raises(ValueError):
         coverage.get(fasta=metagenome, from_spades=False, out=out)

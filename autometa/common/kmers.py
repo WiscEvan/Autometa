@@ -506,7 +506,7 @@ def embed(
     if isinstance(kmers, str) and os.path.exists(kmers) and os.path.getsize(kmers):
         try:
             df = pd.read_csv(kmers, sep="\t", index_col="contig")
-        except (ValueError):
+        except ValueError:
             raise TableFormatError(f"contig column not found in {kmers}")
     elif isinstance(kmers, pd.DataFrame):
         df = kmers
@@ -516,7 +516,7 @@ def embed(
         logger.debug(f"k-mers frequency embedding already exists {out}")
         try:
             return pd.read_csv(out, sep="\t", index_col="contig")
-        except (ValueError):
+        except ValueError:
             raise TableFormatError(f"contig column not found in {out}")
 
     if df.empty:
