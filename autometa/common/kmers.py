@@ -37,7 +37,7 @@ import multiprocessing as mp
 from tqdm import tqdm
 from Bio import SeqIO
 from scipy.stats import gmean
-from skbio.stats.composition import ilr, clr, multiplicative_replacement
+# from skbio.stats.composition import ilr, clr, multiplicative_replacement
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from tsne import bh_sne

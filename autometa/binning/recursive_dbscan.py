@@ -731,7 +731,7 @@ def binning(
 
     logger.info(f"Using {method} clustering method")
     if not taxonomy:
-        return get_clusters(
+        master_out = get_clusters(
             master=master,
             markers_df=markers,
             domain=domain,
@@ -742,6 +742,8 @@ def binning(
             method=method,
             verbose=verbose,
         )
+        outcols = ["cluster", "completeness", "purity"]
+        return master_out[outcols]
 
     # Use taxonomy method
     if reverse_ranks:
@@ -823,7 +825,112 @@ def binning(
     # create a dataframe for any contigs *not* in the clustered dataframe
     unclustered_df = master.loc[~master.index.isin(clustered_df.index)]
     unclustered_df["cluster"] = pd.NA
-    return pd.concat([clustered_df, unclustered_df], sort=True)
+    master_out = pd.concat([clustered_df, unclustered_df], sort=True)
+    outcols = ["cluster", "completeness", "purity"]
+    return master_out[outcols]
+
+
+def length_cutoff_binning(
+    master: pd.DataFrame,
+    markers_df: pd.DataFrame,
+    lengths: pd.DataFrame,
+    starting_rank: str = "superkingdom",
+    domain: str = "bacteria",
+    completeness: float = 20.0,
+    purity: float = 90.0,
+    coverage_stddev: float = 25.0,
+    gc_content_stddev: float = 5.0,
+    clustering_method: str = "dbscan",
+    reverse_ranks: bool = False,
+    verbose: bool = False,
+    length_cutoff_completeness: float = None,
+) -> pd.DataFrame:
+    length_cutoffs = [10000, 7000, 5000, 3000, 900]
+    length_cutoff_binning_rounds = []
+    binned_contigs = set()
+    num_clusters = 0
+    if length_cutoff_completeness:
+        logger.debug(f"Applying completeness criterion >= {length_cutoff_completeness} at the end of each length-cutoff binning round.")
+    else:
+        logger.debug("Keeping all clusters from each round (no length-cutoff completeness criterion)")
+    # Start length cutoff binning rounds
+    for length_cutoff in length_cutoffs:
+        # First set length cutoff criterion
+        length_cutoff_master = pd.merge(
+            master, lengths, how="left", left_index=True, right_index=True
+        )
+        length_cutoff_criterion = length_cutoff_master.length >= length_cutoff
+        # Now set criterion to remove any sequences that have already been binned.
+        if not binned_contigs:
+            length_cutoff_master = length_cutoff_master[length_cutoff_criterion]
+        else:
+            # First apply length cutoff filter
+            length_cutoff_master = length_cutoff_master[length_cutoff_criterion]
+            # Now create and apply binning filter.
+            binned_criterion = length_cutoff_master.index.isin(binned_contigs)
+            unbinned_contigs = length_cutoff_master.loc[~binned_criterion].index
+            length_cutoff_master = length_cutoff_master.loc[unbinned_contigs]
+
+        logger.debug(
+            f"cutoff: {length_cutoff:,}bp; shape: {length_cutoff_master.shape}"
+        )
+        taxa_present = "taxid" in length_cutoff_master.columns
+        cutoff_clusters = binning(
+            master=length_cutoff_master,
+            markers=markers_df,
+            taxonomy=taxa_present,
+            starting_rank=starting_rank,
+            reverse_ranks=reverse_ranks,
+            domain=domain,
+            completeness=completeness,
+            purity=purity,
+            coverage_stddev=coverage_stddev,
+            gc_content_stddev=gc_content_stddev,
+            method=clustering_method,
+            verbose=verbose,
+        )
+        # Output table
+        outcols = ["cluster", "completeness", "purity"]
+        cutoff_clusters = cutoff_clusters[outcols]
+        cutoff_clusters["considered_at_length_cutoff"] = length_cutoff
+        # Only apply length cutoff completeness criterion if it is specified
+        if length_cutoff_completeness:
+            completeness_criterion = (
+                cutoff_clusters.completeness >= length_cutoff_completeness
+            )
+            cutoff_clusters = cutoff_clusters[completeness_criterion]
+        # If no clusters were recovered, continue to next length cutoff
+        if cutoff_clusters.empty:
+            continue
+        # Add the clustered length-cutoff contigs to the set of binned contigs.
+        binned_contigs = binned_contigs.union(
+            {contig for contig in cutoff_clusters.index}
+        )
+
+        # Now we need to munge our binning rounds so there is no 'cluster' naming collisions
+        # We will do this by keeping a count of the number of clusters that have been recovered.
+        translation = {
+            cluster: f"bin_{1 + cluster_i + num_clusters:04d}"
+            for cluster_i, cluster in enumerate(cutoff_clusters.cluster.unique())
+        }
+
+        def rename_cluster(c):
+            return translation[c]
+
+        cutoff_clusters.cluster = cutoff_clusters.cluster.map(rename_cluster)
+        num_clusters += cutoff_clusters.cluster.nunique()
+        outfile = f"binning.lc{length_cutoff}.cc0.tsv" if not length_cutoff_completeness else f"binning.lc{length_cutoff}.cc{length_cutoff_completeness}.tsv"
+        cutoff_clusters.to_csv(
+            outfile, sep="\t", index=True, header=True
+        )
+        length_cutoff_binning_rounds.append(cutoff_clusters)
+    outcols = ["cluster", "completeness", "purity", "considered_at_length_cutoff"]
+    master_out = pd.concat(length_cutoff_binning_rounds, sort=True)
+    unclustered_df = master.loc[~master.index.isin(master_out.index)]
+    logger.info(
+        f"{unclustered_df.shape[0]:,} contigs left unclustered. clustered output shape: {master_out[outcols].shape}"
+    )
+    return master_out[outcols]
 
 
 def main():
@@ -910,6 +1017,19 @@ def main():
         "--taxonomy", metavar="filepath", help="</path/to/taxonomy.tsv>"
     )
     parser.add_argument(
+        "--length-cutoff-completeness",
+        help="Length-cutoff-implementation completeness threshold"
+        "between length cutoff binning rounds."
+        "By default will keep all clusters recovered at each length cutoff.",
+        default=None,
+        type=float,
+    )
+    parser.add_argument(
+        "--length-cutoff-binning",
+        help="</path/to/lengths.tsv>."
+        "Will bin contigs following ordered length cutoffs 10kbp, 7kbp, 5kbp, 3kbp and 900bp",
+    )
+    parser.add_argument(
         "--starting-rank",
         help="Canonical rank at which to begin subsetting taxonomy",
         default="superkingdom",
@@ -981,24 +1101,43 @@ def main():
             right_index=True,
         )
 
-    taxa_present = True if "taxid" in master_df else False
+    taxa_present = "taxid" in master_df.columns
     master_df = master_df.convert_dtypes()
     logger.debug(f"master_df shape: {master_df.shape}")
 
-    master_out = binning(
-        master=master_df,
-        markers=markers_df,
-        taxonomy=taxa_present,
-        starting_rank=args.starting_rank,
-        reverse_ranks=args.reverse_ranks,
-        domain=args.domain,
-        completeness=args.completeness,
-        purity=args.purity,
-        coverage_stddev=args.cov_stddev_limit,
-        gc_content_stddev=args.gc_stddev_limit,
-        method=args.clustering_method,
-        verbose=args.verbose,
-    )
+
+    if args.length_cutoff_binning:
+        lengths = pd.read_csv(args.length_cutoff_binning, sep="\t", index_col="contig")
+        master_out = length_cutoff_binning(
+            master=master_df,
+            markers_df=markers_df,
+            lengths=lengths,
+            starting_rank=args.starting_rank,
+            domain=args.domain,
+            completeness=args.completeness,
+            purity=args.purity,
+            coverage_stddev=args.cov_stddev_limit,
+            gc_content_stddev=args.gc_stddev_limit,
+            clustering_method=args.clustering_method,
+            reverse_ranks=args.reverse_ranks,
+            verbose=args.verbose,
+            length_cutoff_completeness=args.length_cutoff_completeness,
+        )
+    else:
+        master_out = binning(
+            master=master_df,
+            markers=markers_df,
+            taxonomy=taxa_present,
+            starting_rank=args.starting_rank,
+            reverse_ranks=args.reverse_ranks,
+            domain=args.domain,
+            completeness=args.completeness,
+            purity=args.purity,
+            coverage_stddev=args.cov_stddev_limit,
+            gc_content_stddev=args.gc_stddev_limit,
+            method=args.clustering_method,
+            verbose=args.verbose,
+        )
 
     # Output table
     outcols = ["cluster", "completeness", "purity"]
